@@ -35,6 +35,10 @@ export default function App() {
   const latchRef = useRef(false);
   latchRef.current = latchMode;
 
+  // Double-tap detection for auto-toggling latch mode
+  const lastNoteTimeRef = useRef<{ note: number; time: number }>({ note: -1, time: 0 });
+  const DOUBLE_TAP_MS = 300;
+
   // The active key: manual override > auto-locked > detecting
   const activeKey = keyMode !== "auto" ? keyMode : (lockedKey ?? detectedKey);
   const noteNames = noteNamesForKey(activeKey);
@@ -92,6 +96,24 @@ export default function App() {
   }, [runDetection]);
 
   const handleNoteOn = useCallback((note: number, velocity: number = 100) => {
+    // Double-tap detection: same note struck twice quickly toggles latch mode
+    const now = performance.now();
+    const last = lastNoteTimeRef.current;
+    if (last.note === note && now - last.time < DOUBLE_TAP_MS) {
+      setLatchMode((v) => {
+        const next = !v;
+        if (!next) {
+          // Turning off latch — release all non-held notes
+          audio.allNotesOff();
+          sustainedNotesRef.current.clear();
+        }
+        return next;
+      });
+      lastNoteTimeRef.current = { note: -1, time: 0 };
+    } else {
+      lastNoteTimeRef.current = { note, time: now };
+    }
+
     // In latch mode, playing a note that's already held toggles it off
     if (latchRef.current) {
       setActiveNotes((prev) => {
@@ -296,9 +318,9 @@ export default function App() {
                 return !v;
               });
             }}
-            title="Latch mode — notes stay held"
+            title="Key Lock — notes stay held (double-tap a key to toggle)"
           >
-            Hold
+            Key Lock
           </button>
 
           <div className="key-selector">
