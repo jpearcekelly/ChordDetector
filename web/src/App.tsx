@@ -182,30 +182,94 @@ export default function App() {
     setActiveNotes(new Set(heldNotesRef.current));
   }, []);
 
-  // Keyboard shortcuts
+  // QWERTY → MIDI mapping (centered on C4 = MIDI 60)
+  const QWERTY_MAP: Record<string, number> = {
+    // White keys: home row
+    a: 60, // C4
+    s: 62, // D4
+    d: 64, // E4
+    f: 65, // F4
+    g: 67, // G4
+    h: 69, // A4
+    j: 71, // B4
+    k: 72, // C5
+    l: 74, // D5
+    // Black keys: top row
+    w: 61, // C#4
+    e: 63, // D#4
+    r: 66, // F#4
+    t: 68, // G#4
+    y: 70, // A#4
+    u: 73, // C#5
+    i: 75, // D#5
+    // Lower octave: bottom row
+    z: 48, // C3
+    x: 50, // D3
+    c: 52, // E3
+    v: 53, // F3
+    b: 55, // G3
+    n: 57, // A3
+    m: 59, // B3
+    // Lower octave black keys: number row
+    "2": 49, // C#3
+    "3": 51, // D#3
+    "5": 54, // F#3
+    "6": 56, // G#3
+    "7": 58, // A#3
+  };
+  const qwertyHeldRef = useRef<Set<string>>(new Set());
+
+  // Keyboard: QWERTY piano + Cmd+key shortcuts
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      // Don't trigger if user is typing in an input/select
+    const handleDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
+
+      // Cmd/Ctrl + key = toolbar shortcuts
+      if (e.metaKey || e.ctrlKey) {
+        const key = e.key.toLowerCase();
+        if (key === "l") {
+          e.preventDefault();
+          setLatchMode((v) => {
+            const next = !v;
+            if (!next) clearLatch();
+            return next;
+          });
+        } else if (key === "s") {
+          e.preventDefault();
+          setSuggestMode((v) => !v);
+        } else if (key === "n") {
+          e.preventDefault();
+          setShowRomanNumerals((v) => !v);
+        }
+        return;
+      }
+
+      // QWERTY piano keys
       const key = e.key.toLowerCase();
-      if (key === "l") {
+      const midi = QWERTY_MAP[key];
+      if (midi !== undefined && !qwertyHeldRef.current.has(key)) {
         e.preventDefault();
-        setLatchMode((v) => {
-          const next = !v;
-          if (!next) clearLatch();
-          return next;
-        });
-      } else if (key === "s") {
-        e.preventDefault();
-        setSuggestMode((v) => !v);
-      } else if (key === "n") {
-        e.preventDefault();
-        setShowRomanNumerals((v) => !v);
+        qwertyHeldRef.current.add(key);
+        handleNoteOn(midi);
       }
     };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [clearLatch]);
+
+    const handleUp = (e: KeyboardEvent) => {
+      const key = e.key.toLowerCase();
+      const midi = QWERTY_MAP[key];
+      if (midi !== undefined && qwertyHeldRef.current.has(key)) {
+        qwertyHeldRef.current.delete(key);
+        handleNoteOff(midi);
+      }
+    };
+
+    window.addEventListener("keydown", handleDown);
+    window.addEventListener("keyup", handleUp);
+    return () => {
+      window.removeEventListener("keydown", handleDown);
+      window.removeEventListener("keyup", handleUp);
+    };
+  }, [clearLatch, handleNoteOn, handleNoteOff]);
 
   useEffect(() => {
     initMIDI(
@@ -326,14 +390,14 @@ export default function App() {
             onClick={() => setSuggestMode((v) => !v)}
             title="Show suggested notes to complete the chord (S)"
           >
-            Suggestions <span className="shortcut">S</span>
+            Suggestions <span className="shortcut">&#8984;S</span>
           </button>
           <button
             className={`tool-btn ${showRomanNumerals ? "active" : ""}`}
             onClick={() => setShowRomanNumerals((v) => !v)}
             title="Show Roman numeral analysis (N)"
           >
-            Numerals <span className="shortcut">N</span>
+            Numerals <span className="shortcut">&#8984;N</span>
           </button>
           <button
             className={`tool-btn ${latchMode ? "active" : ""}`}
@@ -345,7 +409,7 @@ export default function App() {
             }}
             title="Key Lock — notes stay held (press L or double-tap a key)"
           >
-            Key Lock <span className="shortcut">L</span>
+            Key Lock <span className="shortcut">&#8984;L</span>
           </button>
 
           <div className="key-selector">
