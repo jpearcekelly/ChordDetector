@@ -188,39 +188,11 @@ export default function App() {
     o: 61, // C#4
     p: 63, // D#4
     // [: skip (no black between E4-F4)
-    // ── Bottom row: white keys C2–E3 ──
-    z: 36, // C2
-    x: 38, // D2
-    c: 40, // E2
-    v: 41, // F2
-    b: 43, // G2
-    n: 45, // A2
-    m: 47, // B2
-    ",": 48, // C3
-    ".": 50, // D3
-    "/": 52, // E3
-    // ── Number row: black keys for bottom row ──
-    "2": 37, // C#2
-    "3": 39, // D#2
-    // 4: skip (no black between E2-F2)
-    "5": 42, // F#2
-    "6": 44, // G#2
-    "7": 46, // A#2
-    // 8: skip (no black between B2-C3)
-    "9": 49, // C#3
-    "0": 51, // D#3
-    // -: skip (no black between E3-F3)
   };
-  // Reverse map: MIDI note → display key label (prefer home row over bottom row for duplicates)
+  // Reverse map: MIDI note → display key label
   const MIDI_TO_KEY: Record<number, string> = {};
-  // Fill bottom row first, then home row overwrites duplicates (home row wins)
   for (const [key, midi] of Object.entries(QWERTY_MAP)) {
-    const row = "zxcvbnm,./".includes(key) || "234567890".includes(key) ? "bottom" : "home";
-    if (row === "bottom" && !(midi in MIDI_TO_KEY)) {
-      MIDI_TO_KEY[midi] = key === "," ? "," : key === "." ? "." : key === "/" ? "/" : key === ";" ? ";" : key === "'" ? "'" : key.toUpperCase();
-    } else if (row === "home") {
-      MIDI_TO_KEY[midi] = key === ";" ? ";" : key === "'" ? "'" : key.toUpperCase();
-    }
+    MIDI_TO_KEY[midi] = key === ";" ? ";" : key === "'" ? "'" : key.toUpperCase();
   }
 
   const qwertyHeldRef = useRef<Set<string>>(new Set());

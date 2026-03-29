@@ -207,14 +207,15 @@ body {
 }
 
 .shortcut {
-  font-size: 9px;
+  font-size: 10px;
   padding: 1px 4px;
   border-radius: 3px;
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.12);
   margin-left: 3px;
-  font-family: ui-monospace, monospace;
+  font-family: system-ui, sans-serif;
   vertical-align: baseline;
+  letter-spacing: 0.5px;
 }
 
 /* ── Key selector ──────────────────────────────── */
