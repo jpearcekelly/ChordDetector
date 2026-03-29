@@ -182,18 +182,25 @@ export default function App() {
     setActiveNotes(new Set(heldNotesRef.current));
   }, []);
 
-  // Keyboard shortcut: L to toggle Key Lock
+  // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "l" || e.key === "L") {
-        // Don't trigger if user is typing in an input/select
-        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
+      // Don't trigger if user is typing in an input/select
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
+      const key = e.key.toLowerCase();
+      if (key === "l") {
         e.preventDefault();
         setLatchMode((v) => {
           const next = !v;
           if (!next) clearLatch();
           return next;
         });
+      } else if (key === "s") {
+        e.preventDefault();
+        setSuggestMode((v) => !v);
+      } else if (key === "n") {
+        e.preventDefault();
+        setShowRomanNumerals((v) => !v);
       }
     };
     window.addEventListener("keydown", handler);
@@ -317,16 +324,16 @@ export default function App() {
           <button
             className={`tool-btn ${suggestMode ? "active" : ""}`}
             onClick={() => setSuggestMode((v) => !v)}
-            title="Suggest missing notes to complete the chord"
+            title="Show suggested notes to complete the chord (S)"
           >
-            Suggest
+            Suggestions <span className="shortcut">S</span>
           </button>
           <button
             className={`tool-btn ${showRomanNumerals ? "active" : ""}`}
             onClick={() => setShowRomanNumerals((v) => !v)}
-            title="Show Roman numeral analysis"
+            title="Show Roman numeral analysis (N)"
           >
-            IV
+            Numerals <span className="shortcut">N</span>
           </button>
           <button
             className={`tool-btn ${latchMode ? "active" : ""}`}
@@ -377,19 +384,6 @@ export default function App() {
                   ))}
                 </optgroup>
               </select>
-              {keyMode === "auto" && (
-                <div className="key-confidence-bar">
-                  <div
-                    className="key-confidence-fill"
-                    style={{
-                      width: `${Math.round(keyConfidence * 100)}%`,
-                      backgroundColor: keyConfidence > 0.3
-                        ? `hsl(${120 + keyConfidence * 120}, 60%, 50%)`
-                        : "rgba(255, 255, 255, 0.2)",
-                    }}
-                  />
-                </div>
-              )}
             </div>
           </div>
         </div>
