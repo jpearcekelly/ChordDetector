@@ -206,6 +206,17 @@ body {
   color: #93c5fd;
 }
 
+.shortcut {
+  font-size: 9px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  margin-left: 3px;
+  font-family: ui-monospace, monospace;
+  vertical-align: baseline;
+}
+
 /* ── Key selector ──────────────────────────────── */
 .key-selector {
   display: flex;

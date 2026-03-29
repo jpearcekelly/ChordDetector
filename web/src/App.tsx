@@ -182,6 +182,24 @@ export default function App() {
     setActiveNotes(new Set(heldNotesRef.current));
   }, []);
 
+  // Keyboard shortcut: L to toggle Key Lock
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "l" || e.key === "L") {
+        // Don't trigger if user is typing in an input/select
+        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
+        e.preventDefault();
+        setLatchMode((v) => {
+          const next = !v;
+          if (!next) clearLatch();
+          return next;
+        });
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [clearLatch]);
+
   useEffect(() => {
     initMIDI(
       {
@@ -318,9 +336,9 @@ export default function App() {
                 return !v;
               });
             }}
-            title="Key Lock — notes stay held (double-tap a key to toggle)"
+            title="Key Lock — notes stay held (press L or double-tap a key)"
           >
-            Key Lock
+            Key Lock <span className="shortcut">L</span>
           </button>
 
           <div className="key-selector">
