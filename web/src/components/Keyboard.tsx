@@ -160,8 +160,11 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], onNo
     return null;
   }, []);
 
+  const isDraggingRef = useRef(false);
+
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
+      isDraggingRef.current = true;
       const note = hitTest(e.clientX, e.clientY);
       if (note !== null) {
         pressedRef.current = note;
@@ -172,7 +175,24 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], onNo
     [hitTest, onNoteOn],
   );
 
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (!isDraggingRef.current) return;
+      const note = hitTest(e.clientX, e.clientY);
+      if (note !== null && note !== pressedRef.current) {
+        // Release the previous note, play the new one
+        if (pressedRef.current !== null) {
+          onNoteOff?.(pressedRef.current);
+        }
+        pressedRef.current = note;
+        onNoteOn?.(note);
+      }
+    },
+    [hitTest, onNoteOn, onNoteOff],
+  );
+
   const handlePointerUp = useCallback(() => {
+    isDraggingRef.current = false;
     if (pressedRef.current !== null) {
       onNoteOff?.(pressedRef.current);
       pressedRef.current = null;
@@ -182,8 +202,9 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], onNo
   return (
     <canvas
       ref={canvasRef}
-      style={{ width: "100%", height: "160px", cursor: "pointer", borderRadius: 6 }}
+      style={{ width: "100%", height: "160px", cursor: "pointer", borderRadius: 6, touchAction: "none" }}
       onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerLeave={handlePointerUp}
     />
