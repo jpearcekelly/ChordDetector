@@ -36,10 +36,6 @@ export default function App() {
   const latchRef = useRef(false);
   latchRef.current = latchMode;
 
-  // Double-tap detection for auto-toggling latch mode
-  const lastNoteTimeRef = useRef<{ note: number; time: number }>({ note: -1, time: 0 });
-  const DOUBLE_TAP_MS = 300;
-
   // The active key: manual override > auto-locked > detecting
   const activeKey = keyMode !== "auto" ? keyMode : (lockedKey ?? detectedKey);
   const noteNames = noteNamesForKey(activeKey);
@@ -97,24 +93,6 @@ export default function App() {
   }, [runDetection]);
 
   const handleNoteOn = useCallback((note: number, velocity: number = 100) => {
-    // Double-tap detection: same note struck twice quickly toggles latch mode
-    const now = performance.now();
-    const last = lastNoteTimeRef.current;
-    if (last.note === note && now - last.time < DOUBLE_TAP_MS) {
-      setLatchMode((v) => {
-        const next = !v;
-        if (!next) {
-          // Turning off latch — release all non-held notes
-          audio.allNotesOff();
-          sustainedNotesRef.current.clear();
-        }
-        return next;
-      });
-      lastNoteTimeRef.current = { note: -1, time: 0 };
-    } else {
-      lastNoteTimeRef.current = { note, time: now };
-    }
-
     // In latch mode, playing a note that's already held toggles it off
     if (latchRef.current) {
       setActiveNotes((prev) => {
@@ -252,15 +230,8 @@ export default function App() {
     const handleDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
 
-      // Shift+H = toggle hotkey labels
-      if (e.shiftKey && e.key === "H") {
-        e.preventDefault();
-        setShowHotkeys((v) => !v);
-        return;
-      }
-
-      // Cmd/Ctrl + key = toolbar shortcuts
-      if (e.metaKey || e.ctrlKey) {
+      // Shift or Cmd/Ctrl + key = toolbar shortcuts
+      if (e.shiftKey || e.metaKey || e.ctrlKey) {
         const key = e.key.toLowerCase();
         if (key === "l") {
           e.preventDefault();
@@ -275,6 +246,9 @@ export default function App() {
         } else if (key === "n") {
           e.preventDefault();
           setShowRomanNumerals((v) => !v);
+        } else if (key === "h") {
+          e.preventDefault();
+          setShowHotkeys((v) => !v);
         }
         return;
       }
@@ -426,14 +400,14 @@ export default function App() {
             onClick={() => setSuggestMode((v) => !v)}
             title="Show suggested notes to complete the chord (S)"
           >
-            Suggestions <span className="shortcut">&#8984;S</span>
+            Suggestions <span className="shortcut">&#8679;S</span>
           </button>
           <button
             className={`tool-btn ${showRomanNumerals ? "active" : ""}`}
             onClick={() => setShowRomanNumerals((v) => !v)}
             title="Show Roman numeral analysis (N)"
           >
-            Numerals <span className="shortcut">&#8984;N</span>
+            Numerals <span className="shortcut">&#8679;N</span>
           </button>
           <button
             className={`tool-btn ${latchMode ? "active" : ""}`}
@@ -445,7 +419,7 @@ export default function App() {
             }}
             title="Key Lock — notes stay held (press L or double-tap a key)"
           >
-            Key Lock <span className="shortcut">&#8984;L</span>
+            Key Lock <span className="shortcut">&#8679;L</span>
           </button>
           <button
             className={`tool-btn ${showHotkeys ? "active" : ""}`}
