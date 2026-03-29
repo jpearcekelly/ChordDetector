@@ -182,40 +182,55 @@ export default function App() {
     setActiveNotes(new Set(heldNotesRef.current));
   }, []);
 
-  // QWERTY → MIDI mapping (centered on C4 = MIDI 60)
+  // QWERTY → MIDI mapping — mirrors piano layout with proper gaps
+  // Home row (A-') = C3–F4, bottom row (Z-/) = C2–E3
+  // Black keys on row above each, skipping E-F and B-C gaps
   const QWERTY_MAP: Record<string, number> = {
-    // White keys: home row
-    a: 60, // C4
-    s: 62, // D4
-    d: 64, // E4
-    f: 65, // F4
-    g: 67, // G4
-    h: 69, // A4
-    j: 71, // B4
-    k: 72, // C5
-    l: 74, // D5
-    // Black keys: top row
-    w: 61, // C#4
-    e: 63, // D#4
-    r: 66, // F#4
-    t: 68, // G#4
-    y: 70, // A#4
-    u: 73, // C#5
-    i: 75, // D#5
-    // Lower octave: bottom row
-    z: 48, // C3
-    x: 50, // D3
-    c: 52, // E3
-    v: 53, // F3
-    b: 55, // G3
-    n: 57, // A3
-    m: 59, // B3
-    // Lower octave black keys: number row
-    "2": 49, // C#3
-    "3": 51, // D#3
-    "5": 54, // F#3
-    "6": 56, // G#3
-    "7": 58, // A#3
+    // ── Home row: white keys C3–F4 ──
+    a: 48, // C3
+    s: 50, // D3
+    d: 52, // E3
+    f: 53, // F3
+    g: 55, // G3
+    h: 57, // A3
+    j: 59, // B3
+    k: 60, // C4 (middle C)
+    l: 62, // D4
+    ";": 64, // E4
+    "'": 65, // F4
+    // ── Top row: black keys for home row (gaps at E-F, B-C) ──
+    w: 49, // C#3
+    e: 51, // D#3
+    // r: skip (no black between E3-F3)
+    t: 54, // F#3
+    y: 56, // G#3
+    u: 58, // A#3
+    // i: skip (no black between B3-C4)
+    o: 61, // C#4
+    p: 63, // D#4
+    // [: skip (no black between E4-F4)
+    // ── Bottom row: white keys C2–E3 ──
+    z: 36, // C2
+    x: 38, // D2
+    c: 40, // E2
+    v: 41, // F2
+    b: 43, // G2
+    n: 45, // A2
+    m: 47, // B2
+    ",": 48, // C3
+    ".": 50, // D3
+    "/": 52, // E3
+    // ── Number row: black keys for bottom row ──
+    "2": 37, // C#2
+    "3": 39, // D#2
+    // 4: skip (no black between E2-F2)
+    "5": 42, // F#2
+    "6": 44, // G#2
+    "7": 46, // A#2
+    // 8: skip (no black between B2-C3)
+    "9": 49, // C#3
+    "0": 51, // D#3
+    // -: skip (no black between E3-F3)
   };
   const qwertyHeldRef = useRef<Set<string>>(new Set());
 
