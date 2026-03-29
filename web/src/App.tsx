@@ -16,7 +16,7 @@ export default function App() {
   const [keyMode, setKeyMode] = useState<"auto" | Key>("auto");
   const [detectedKey, setDetectedKey] = useState<Key | null>(null);
   const [lockedKey, setLockedKey] = useState<Key | null>(null); // auto-locked once confident
-  const [keyConfidence, setKeyConfidence] = useState(0);
+  const keyConfidenceRef = useRef(0);
   const histogramRef = useRef<number[]>(new Array(12).fill(0));
   const decayTimerRef = useRef<number | null>(null);
   const resetTimerRef = useRef<number | null>(null);
@@ -26,6 +26,7 @@ export default function App() {
   const [latchMode, setLatchMode] = useState(false);
   const [suggestMode, setSuggestMode] = useState(true);
   const [showHotkeys, setShowHotkeys] = useState(false);
+  const [pedalDown, setPedalDown] = useState(false);
 
   // Track sustain pedal state and which notes are being sustained
   const sustainRef = useRef(false);
@@ -48,7 +49,7 @@ export default function App() {
     const result = detectKey(histogramRef.current);
     if (result) {
       setDetectedKey(result.key);
-      setKeyConfidence(result.confidence);
+      keyConfidenceRef.current = result.confidence;
 
       // Auto-lock when confidence is high enough and no key is locked yet
       setLockedKey((prev) => {
@@ -87,7 +88,7 @@ export default function App() {
         histogramRef.current = new Array(12).fill(0);
         setLockedKey(null);
         setDetectedKey(null);
-        setKeyConfidence(0);
+        keyConfidenceRef.current = 0;
       }, 12000);
     }, 3000);
   }, [runDetection]);
@@ -134,10 +135,12 @@ export default function App() {
 
   const handleSustainOn = useCallback(() => {
     sustainRef.current = true;
+    setPedalDown(true);
   }, []);
 
   const handleSustainOff = useCallback(() => {
     sustainRef.current = false;
+    setPedalDown(false);
     if (latchRef.current) return;
     for (const note of sustainedNotesRef.current) {
       audio.noteOff(note);
@@ -225,6 +228,13 @@ export default function App() {
         return;
       }
 
+      // Spacebar = sustain pedal
+      if (e.key === " ") {
+        e.preventDefault();
+        if (!sustainRef.current) handleSustainOn();
+        return;
+      }
+
       // QWERTY piano keys
       const key = e.key.toLowerCase();
       const midi = QWERTY_MAP[key];
@@ -236,6 +246,12 @@ export default function App() {
     };
 
     const handleUp = (e: KeyboardEvent) => {
+      // Spacebar release = pedal up
+      if (e.key === " ") {
+        handleSustainOff();
+        return;
+      }
+
       const key = e.key.toLowerCase();
       const midi = QWERTY_MAP[key];
       if (midi !== undefined && qwertyHeldRef.current.has(key)) {
@@ -250,7 +266,7 @@ export default function App() {
       window.removeEventListener("keydown", handleDown);
       window.removeEventListener("keyup", handleUp);
     };
-  }, [clearLatch, handleNoteOn, handleNoteOff]);
+  }, [clearLatch, handleNoteOn, handleNoteOff, handleSustainOn, handleSustainOff]);
 
   useEffect(() => {
     initMIDI(
@@ -400,6 +416,9 @@ export default function App() {
           >
             Hotkeys <span className="shortcut">&#8679;H</span>
           </button>
+          <span className={`tool-btn pedal-indicator ${pedalDown ? "active" : ""}`}>
+            Pedal <span className="shortcut">Space</span>
+          </span>
 
           <div className="key-selector">
             <label htmlFor="key-select">Key:</label>
