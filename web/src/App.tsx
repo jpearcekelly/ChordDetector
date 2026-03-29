@@ -25,6 +25,7 @@ export default function App() {
   const [showRomanNumerals, setShowRomanNumerals] = useState(false);
   const [latchMode, setLatchMode] = useState(false);
   const [suggestMode, setSuggestMode] = useState(true);
+  const [showHotkeys, setShowHotkeys] = useState(false);
 
   // Track sustain pedal state and which notes are being sustained
   const sustainRef = useRef(false);
@@ -232,12 +233,31 @@ export default function App() {
     "0": 51, // D#3
     // -: skip (no black between E3-F3)
   };
+  // Reverse map: MIDI note → display key label (prefer home row over bottom row for duplicates)
+  const MIDI_TO_KEY: Record<number, string> = {};
+  // Fill bottom row first, then home row overwrites duplicates (home row wins)
+  for (const [key, midi] of Object.entries(QWERTY_MAP)) {
+    const row = "zxcvbnm,./".includes(key) || "234567890".includes(key) ? "bottom" : "home";
+    if (row === "bottom" && !(midi in MIDI_TO_KEY)) {
+      MIDI_TO_KEY[midi] = key === "," ? "," : key === "." ? "." : key === "/" ? "/" : key === ";" ? ";" : key === "'" ? "'" : key.toUpperCase();
+    } else if (row === "home") {
+      MIDI_TO_KEY[midi] = key === ";" ? ";" : key === "'" ? "'" : key.toUpperCase();
+    }
+  }
+
   const qwertyHeldRef = useRef<Set<string>>(new Set());
 
   // Keyboard: QWERTY piano + Cmd+key shortcuts
   useEffect(() => {
     const handleDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
+
+      // Shift+H = toggle hotkey labels
+      if (e.shiftKey && e.key === "H") {
+        e.preventDefault();
+        setShowHotkeys((v) => !v);
+        return;
+      }
 
       // Cmd/Ctrl + key = toolbar shortcuts
       if (e.metaKey || e.ctrlKey) {
@@ -371,6 +391,7 @@ export default function App() {
         <Keyboard
           activeNotes={activeNotes}
           suggestedPitchClasses={suggestMode ? chord.missingNotes : []}
+          hotkeyLabels={showHotkeys ? MIDI_TO_KEY : undefined}
           onNoteOn={(n) => handleNoteOn(n)}
           onNoteOff={handleNoteOff}
         />
@@ -425,6 +446,13 @@ export default function App() {
             title="Key Lock — notes stay held (press L or double-tap a key)"
           >
             Key Lock <span className="shortcut">&#8984;L</span>
+          </button>
+          <button
+            className={`tool-btn ${showHotkeys ? "active" : ""}`}
+            onClick={() => setShowHotkeys((v) => !v)}
+            title="Show keyboard shortcuts on piano keys (Shift+H)"
+          >
+            Hotkeys <span className="shortcut">&#8679;H</span>
           </button>
 
           <div className="key-selector">

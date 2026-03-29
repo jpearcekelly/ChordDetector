@@ -3,6 +3,7 @@ import { useRef, useEffect, useCallback } from "react";
 interface KeyboardProps {
   activeNotes: Set<number>;
   suggestedPitchClasses?: number[]; // pitch classes to highlight as ghost notes
+  hotkeyLabels?: Record<number, string>; // MIDI note → key label to show on keys
   onNoteOn?: (note: number) => void;
   onNoteOff?: (note: number) => void;
 }
@@ -28,7 +29,7 @@ function midiForWhiteIndex(i: number): number {
 
 const TOTAL_WHITE_KEYS = NUM_OCTAVES * 7 + 1;
 
-export default function Keyboard({ activeNotes, suggestedPitchClasses = [], onNoteOn, onNoteOff }: KeyboardProps) {
+export default function Keyboard({ activeNotes, suggestedPitchClasses = [], hotkeyLabels, onNoteOn, onNoteOff }: KeyboardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const pressedRef = useRef<number | null>(null);
 
@@ -92,6 +93,14 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], onNo
         ctx.textAlign = "center";
         ctx.fillText(label, x + wkw / 2, h - 6);
       }
+
+      // Hotkey label
+      if (hotkeyLabels && hotkeyLabels[midi]) {
+        ctx.fillStyle = isActive ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.25)";
+        ctx.font = "600 10px ui-monospace, monospace";
+        ctx.textAlign = "center";
+        ctx.fillText(hotkeyLabels[midi], x + wkw / 2, h * 0.55);
+      }
     }
 
     // Black keys
@@ -120,9 +129,17 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], onNo
           ctx.arc(x + bkw / 2, bkh * 0.75, 3, 0, Math.PI * 2);
           ctx.fill();
         }
+
+        // Hotkey label on black keys
+        if (hotkeyLabels && hotkeyLabels[midi]) {
+          ctx.fillStyle = isActive ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.35)";
+          ctx.font = "600 9px ui-monospace, monospace";
+          ctx.textAlign = "center";
+          ctx.fillText(hotkeyLabels[midi], x + bkw / 2, bkh * 0.55);
+        }
       }
     }
-  }, [activeNotes, suggestedPitchClasses]);
+  }, [activeNotes, suggestedPitchClasses, hotkeyLabels]);
 
   useEffect(() => {
     draw();
