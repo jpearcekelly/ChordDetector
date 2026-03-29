@@ -1,0 +1,16 @@
+# Dependencies
+web/node_modules/
+
+# Build output
+web/dist/
+
+# macOS
+.DS_Store
+
+# Xcode
+ChordDetector.xcodeproj/xcuserdata/
+ChordDetector.xcodeproj/project.xcworkspace/xcuserdata/
+
+# IDE
+.idea/
+.vscode/
