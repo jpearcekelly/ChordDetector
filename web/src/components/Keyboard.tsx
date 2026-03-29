@@ -94,12 +94,28 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], hotk
         ctx.fillText(label, x + wkw / 2, h - 6);
       }
 
-      // Hotkey label
+      // Hotkey badge on white keys — positioned below the black keys
       if (hotkeyLabels && hotkeyLabels[midi]) {
-        ctx.fillStyle = isActive ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.25)";
-        ctx.font = "600 10px ui-monospace, monospace";
+        const label = hotkeyLabels[midi];
+        const bx = x + wkw / 2;
+        const by = bkh + (h - bkh) * 0.45;
+        const badgeSize = Math.min(wkw * 0.55, 18);
+        const radius = 3;
+
+        ctx.fillStyle = isActive ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.07)";
+        ctx.beginPath();
+        ctx.roundRect(bx - badgeSize / 2, by - badgeSize / 2, badgeSize, badgeSize, radius);
+        ctx.fill();
+        ctx.strokeStyle = isActive ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.12)";
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+
+        ctx.fillStyle = isActive ? "rgba(255,255,255,0.9)" : "rgba(0,0,0,0.3)";
+        ctx.font = `600 ${Math.round(badgeSize * 0.55)}px system-ui, sans-serif`;
         ctx.textAlign = "center";
-        ctx.fillText(hotkeyLabels[midi], x + wkw / 2, h * 0.55);
+        ctx.textBaseline = "middle";
+        ctx.fillText(label, bx, by);
+        ctx.textBaseline = "alphabetic";
       }
     }
 
@@ -130,12 +146,28 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], hotk
           ctx.fill();
         }
 
-        // Hotkey label on black keys
+        // Hotkey badge on black keys — centered vertically
         if (hotkeyLabels && hotkeyLabels[midi]) {
-          ctx.fillStyle = isActive ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.35)";
-          ctx.font = "600 9px ui-monospace, monospace";
+          const label = hotkeyLabels[midi];
+          const bx = x + bkw / 2;
+          const by = bkh * 0.55;
+          const badgeSize = Math.min(bkw * 0.65, 16);
+          const radius = 3;
+
+          ctx.fillStyle = isActive ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.08)";
+          ctx.beginPath();
+          ctx.roundRect(bx - badgeSize / 2, by - badgeSize / 2, badgeSize, badgeSize, radius);
+          ctx.fill();
+          ctx.strokeStyle = isActive ? "rgba(255,255,255,0.35)" : "rgba(255,255,255,0.15)";
+          ctx.lineWidth = 0.5;
+          ctx.stroke();
+
+          ctx.fillStyle = isActive ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.45)";
+          ctx.font = `600 ${Math.round(badgeSize * 0.55)}px system-ui, sans-serif`;
           ctx.textAlign = "center";
-          ctx.fillText(hotkeyLabels[midi], x + bkw / 2, bkh * 0.55);
+          ctx.textBaseline = "middle";
+          ctx.fillText(label, bx, by);
+          ctx.textBaseline = "alphabetic";
         }
       }
     }
