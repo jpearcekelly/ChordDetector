@@ -107,6 +107,8 @@ export default function App() {
         return new Set(prev).add(note);
       });
     } else {
+      // Re-trigger audio even if note is already sustained by pedal
+      audio.noteOff(note);
       audio.noteOn(note, velocity);
       setActiveNotes((prev) => new Set(prev).add(note));
     }
