@@ -2,6 +2,7 @@ import { useRef, useEffect, useCallback } from "react";
 
 interface KeyboardProps {
   activeNotes: Set<number>;
+  suggestedPitchClasses?: number[]; // pitch classes to highlight as ghost notes
   onNoteOn?: (note: number) => void;
   onNoteOff?: (note: number) => void;
 }
@@ -27,7 +28,7 @@ function midiForWhiteIndex(i: number): number {
 
 const TOTAL_WHITE_KEYS = NUM_OCTAVES * 7 + 1;
 
-export default function Keyboard({ activeNotes, onNoteOn, onNoteOff }: KeyboardProps) {
+export default function Keyboard({ activeNotes, suggestedPitchClasses = [], onNoteOn, onNoteOff }: KeyboardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const pressedRef = useRef<number | null>(null);
 
@@ -51,16 +52,33 @@ export default function Keyboard({ activeNotes, onNoteOn, onNoteOff }: KeyboardP
 
     ctx.clearRect(0, 0, w, h);
 
+    const suggestedSet = new Set(suggestedPitchClasses);
+
     // White keys
     for (let i = 0; i < TOTAL_WHITE_KEYS; i++) {
       const midi = midiForWhiteIndex(i);
       const isActive = activeNotes.has(midi);
+      const isSuggested = !isActive && suggestedSet.has(midi % 12);
       const x = i * wkw;
 
-      ctx.fillStyle = isActive ? "rgba(59, 130, 246, 0.55)" : "#ffffff";
+      if (isActive) {
+        ctx.fillStyle = "rgba(59, 130, 246, 0.55)";
+      } else if (isSuggested) {
+        ctx.fillStyle = "rgba(255, 255, 255, 0.75)";
+      } else {
+        ctx.fillStyle = "#ffffff";
+      }
       ctx.beginPath();
       ctx.roundRect(x + 0.5, 0.5, wkw - 1, h - 1, 4);
       ctx.fill();
+
+      // Draw a subtle dot on suggested white keys
+      if (isSuggested) {
+        ctx.fillStyle = "rgba(59, 130, 246, 0.25)";
+        ctx.beginPath();
+        ctx.arc(x + wkw / 2, h * 0.75, 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
 
       ctx.strokeStyle = "rgba(128, 128, 128, 0.35)";
       ctx.lineWidth = 0.5;
@@ -81,15 +99,30 @@ export default function Keyboard({ activeNotes, onNoteOn, onNoteOff }: KeyboardP
       for (const bk of BLACK_KEYS) {
         const midi = (START_OCTAVE + octave) * 12 + bk.pitch;
         const isActive = activeNotes.has(midi);
+        const isSuggested = !isActive && suggestedSet.has(midi % 12);
         const x = (octave * 7 + bk.xFrac) * wkw - bkw / 2;
 
-        ctx.fillStyle = isActive ? "rgb(59, 130, 246)" : "#1a1a1a";
+        if (isActive) {
+          ctx.fillStyle = "rgb(59, 130, 246)";
+        } else if (isSuggested) {
+          ctx.fillStyle = "rgba(59, 130, 246, 0.2)";
+        } else {
+          ctx.fillStyle = "#1a1a1a";
+        }
         ctx.beginPath();
         ctx.roundRect(x, 0, bkw, bkh, 3);
         ctx.fill();
+
+        // Dot on suggested black keys
+        if (isSuggested) {
+          ctx.fillStyle = "rgba(59, 130, 246, 0.4)";
+          ctx.beginPath();
+          ctx.arc(x + bkw / 2, bkh * 0.75, 3, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
     }
-  }, [activeNotes]);
+  }, [activeNotes, suggestedPitchClasses]);
 
   useEffect(() => {
     draw();

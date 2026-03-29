@@ -15,13 +15,16 @@ export default function App() {
   // Key detection state
   const [keyMode, setKeyMode] = useState<"auto" | Key>("auto");
   const [detectedKey, setDetectedKey] = useState<Key | null>(null);
+  const [lockedKey, setLockedKey] = useState<Key | null>(null); // auto-locked once confident
   const [keyConfidence, setKeyConfidence] = useState(0);
   const histogramRef = useRef<number[]>(new Array(12).fill(0));
   const decayTimerRef = useRef<number | null>(null);
+  const resetTimerRef = useRef<number | null>(null);
 
   // Feature toggles
   const [showRomanNumerals, setShowRomanNumerals] = useState(false);
   const [latchMode, setLatchMode] = useState(false);
+  const [suggestMode, setSuggestMode] = useState(true);
 
   // Track sustain pedal state and which notes are being sustained
   const sustainRef = useRef(false);
@@ -32,9 +35,12 @@ export default function App() {
   const latchRef = useRef(false);
   latchRef.current = latchMode;
 
-  // The active key: manual override or auto-detected
-  const activeKey = keyMode === "auto" ? detectedKey : keyMode;
+  // The active key: manual override > auto-locked > detecting
+  const activeKey = keyMode !== "auto" ? keyMode : (lockedKey ?? detectedKey);
   const noteNames = noteNamesForKey(activeKey);
+
+  // Key detection confidence threshold to auto-lock
+  const LOCK_THRESHOLD = 0.25;
 
   // Update pitch class histogram when notes change
   const runDetection = useCallback(() => {
@@ -42,6 +48,13 @@ export default function App() {
     if (result) {
       setDetectedKey(result.key);
       setKeyConfidence(result.confidence);
+
+      // Auto-lock when confidence is high enough and no key is locked yet
+      setLockedKey((prev) => {
+        if (prev) return prev; // already locked
+        if (result.confidence >= LOCK_THRESHOLD) return result.key;
+        return null;
+      });
     }
   }, []);
 
@@ -56,11 +69,25 @@ export default function App() {
 
     runDetection();
 
-    // Idle decay: when you stop playing, histogram fades
+    // Cancel any pending reset — player is active
+    if (resetTimerRef.current) {
+      clearTimeout(resetTimerRef.current);
+      resetTimerRef.current = null;
+    }
+
+    // Idle decay after brief pause
     if (decayTimerRef.current) clearTimeout(decayTimerRef.current);
     decayTimerRef.current = window.setTimeout(() => {
       histogramRef.current = histogramRef.current.map((v) => v * 0.75);
       runDetection();
+
+      // Long silence: reset key detection entirely after 12 seconds
+      resetTimerRef.current = window.setTimeout(() => {
+        histogramRef.current = new Array(12).fill(0);
+        setLockedKey(null);
+        setDetectedKey(null);
+        setKeyConfidence(0);
+      }, 12000);
     }, 3000);
   }, [runDetection]);
 
@@ -146,7 +173,7 @@ export default function App() {
     );
   }, [handleNoteOn, handleNoteOff, handleAllNotesOff, handleSustainOn, handleSustainOff]);
 
-  const chord = detectChord(activeNotes, noteNames);
+  const chord = detectChord(activeNotes, noteNames, activeKey);
   const sortedNotes = [...activeNotes].sort((a, b) => a - b);
   const hasNotes = activeNotes.size > 0;
 
@@ -158,9 +185,18 @@ export default function App() {
   return (
     <div className="app">
       <div className="chord-display">
-        <h1 className={`chord-name ${hasNotes ? (chord.exact ? "active" : "uncertain") : ""}`}>
-          {chord.name}
-        </h1>
+        {hasNotes ? (
+          <div className="chord-name-row">
+            <h1 className={`chord-name ${chord.exact ? "active" : "uncertain"}`}>
+              {chord.name}
+            </h1>
+            {chord.inversion && (
+              <span className="inversion-label">{chord.inversion}</span>
+            )}
+          </div>
+        ) : (
+          <div className="empty-state">Play something</div>
+        )}
         {roman && (
           <div className="roman-numeral">{roman}</div>
         )}
@@ -172,17 +208,43 @@ export default function App() {
           </div>
         )}
         <div className="note-pills">
-          {sortedNotes.map((note) => (
-            <span key={note} className="pill">
-              {noteName(note, noteNames)}
-            </span>
-          ))}
+          {(() => {
+            // Build combined list: active notes + ghost notes, sorted by pitch class
+            const pills: { key: string; label: string; missing: boolean; sortPc: number }[] = [];
+            for (const note of sortedNotes) {
+              pills.push({
+                key: `n${note}`,
+                label: noteName(note, noteNames),
+                missing: false,
+                sortPc: note % 12,
+              });
+            }
+            if (suggestMode) {
+              for (const pc of chord.missingNotes) {
+                pills.push({
+                  key: `m${pc}`,
+                  label: noteNames[pc],
+                  missing: true,
+                  sortPc: pc,
+                });
+              }
+            }
+            // Sort by pitch class relative to the chord root so the chord is in order
+            const root = chord.root >= 0 ? chord.root : 0;
+            pills.sort((a, b) => ((a.sortPc - root + 12) % 12) - ((b.sortPc - root + 12) % 12));
+            return pills.map((p) => (
+              <span key={p.key} className={`pill ${p.missing ? "missing" : ""}`}>
+                {p.label}
+              </span>
+            ));
+          })()}
         </div>
       </div>
 
       <div className="keyboard-area">
         <Keyboard
           activeNotes={activeNotes}
+          suggestedPitchClasses={suggestMode ? chord.missingNotes : []}
           onNoteOn={(n) => handleNoteOn(n)}
           onNoteOff={handleNoteOff}
         />
@@ -213,6 +275,13 @@ export default function App() {
 
         <div className="toolbar">
           <button
+            className={`tool-btn ${suggestMode ? "active" : ""}`}
+            onClick={() => setSuggestMode((v) => !v)}
+            title="Suggest missing notes to complete the chord"
+          >
+            Suggest
+          </button>
+          <button
             className={`tool-btn ${showRomanNumerals ? "active" : ""}`}
             onClick={() => setShowRomanNumerals((v) => !v)}
             title="Show Roman numeral analysis"
@@ -234,24 +303,6 @@ export default function App() {
 
           <div className="key-selector">
             <label htmlFor="key-select">Key:</label>
-            {keyMode === "auto" && detectedKey && (
-              <button
-                className="tool-btn lock-btn"
-                onClick={() => setKeyMode(detectedKey)}
-                title={`Lock key to ${formatKey(detectedKey)}`}
-              >
-                Lock
-              </button>
-            )}
-            {keyMode !== "auto" && (
-              <button
-                className="tool-btn lock-btn active"
-                onClick={() => setKeyMode("auto")}
-                title="Unlock — return to auto-detect"
-              >
-                Unlock
-              </button>
-            )}
             <div className="key-select-wrapper">
               <select
                 id="key-select"
@@ -260,6 +311,8 @@ export default function App() {
                   const val = e.target.value;
                   if (val === "auto") {
                     setKeyMode("auto");
+                    setLockedKey(null);
+                    histogramRef.current = new Array(12).fill(0);
                   } else {
                     const [tonic, mode] = val.split("-");
                     setKeyMode({ tonic: Number(tonic), mode: mode as "major" | "minor" });
@@ -267,7 +320,7 @@ export default function App() {
                 }}
               >
                 <option value="auto">
-                  Auto{detectedKey ? ` · ${formatKey(detectedKey)}` : ""}
+                  Auto{lockedKey ? ` · ${formatKey(lockedKey)}` : detectedKey ? ` · ${formatKey(detectedKey)}…` : ""}
                 </option>
                 <optgroup label="Major">
                   {ALL_KEYS.filter((k) => k.mode === "major").map((k) => (

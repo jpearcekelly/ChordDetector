@@ -51,6 +51,8 @@ const CHORD_PATTERNS: ChordPattern[] = [
   { intervals: [0, 3, 7, 8, 10], suffix: "m7b13", priority: 4 },
   { intervals: [0, 2, 5, 7, 10], suffix: "9sus4", priority: 5 },
   { intervals: [0, 2, 3, 7, 11], suffix: "mMaj9", priority: 5 },
+  { intervals: [0, 3, 7, 9, 11], suffix: "m6maj7", priority: 5 },
+  { intervals: [0, 4, 7, 9, 11], suffix: "6maj7", priority: 5 },
 
   // ── 4-note (7th chords) ────────────────────────
   { intervals: [0, 4, 7, 11], suffix: "maj7", priority: 9 },
@@ -105,6 +107,8 @@ type Interpretation = {
   suffix: string;
   score: number;
   exact: boolean;
+  inversion: string | null;
+  missingNotes: number[]; // pitch classes in the pattern but not played
 };
 
 export type ChordResult = {
@@ -112,6 +116,8 @@ export type ChordResult = {
   root: number; // pitch class of chord root
   suffix: string;
   exact: boolean;
+  inversion: string | null; // e.g. "2nd inv." — separate from name for styling
+  missingNotes: number[]; // pitch classes not played but in the matched pattern
   alternatives: string[];
 };
 
@@ -125,12 +131,22 @@ function bassWeight(notes: Set<number>, pitchClass: number): number {
   return count;
 }
 
-export function detectChord(notes: Set<number>, noteNames: string[] = DEFAULT_NOTE_NAMES): ChordResult {
-  if (notes.size === 0) return { name: "—", root: -1, suffix: "", exact: true, alternatives: [] };
+// Diatonic pitch classes for each key mode (semitone offsets from tonic)
+const MAJOR_SCALE = [0, 2, 4, 5, 7, 9, 11];
+const MINOR_SCALE = [0, 2, 3, 5, 7, 8, 10]; // natural minor
+
+type KeyInfo = { tonic: number; mode: "major" | "minor" } | null;
+
+export function detectChord(
+  notes: Set<number>,
+  noteNames: string[] = DEFAULT_NOTE_NAMES,
+  key: KeyInfo = null,
+): ChordResult {
+  if (notes.size === 0) return { name: "—", root: -1, suffix: "", exact: true, inversion: null, missingNotes: [], alternatives: [] };
 
   if (notes.size === 1) {
     const note = notes.values().next().value!;
-    return { name: noteNames[note % 12], root: note % 12, suffix: "", exact: true, alternatives: [] };
+    return { name: noteNames[note % 12], root: note % 12, suffix: "", exact: true, inversion: null, missingNotes: [], alternatives: [] };
   }
 
   const pitchClasses = [...new Set([...notes].map((n) => n % 12))].sort((a, b) => a - b);
@@ -188,17 +204,51 @@ export function detectChord(notes: Set<number>, noteNames: string[] = DEFAULT_NO
         }
       }
 
+      // Key-aware scoring: diatonic chords get a bonus, tonic gets the most
+      if (key) {
+        const scale = key.mode === "major" ? MAJOR_SCALE : MINOR_SCALE;
+        const degreeFromTonic = (root - key.tonic + 12) % 12;
+        if (degreeFromTonic === 0) {
+          score += 30; // tonic chord — strongest preference
+        } else if (scale.includes(degreeFromTonic)) {
+          score += 15; // diatonic chord
+        }
+      }
+
       // Prefer common chords
       score += pattern.priority;
 
       const chordName = noteNames[root] + pattern.suffix;
 
-      // Slash notation when root ≠ bass (for exact matches, or high-coverage subset-up)
+      // For triads (3-note exact match), use inversion labels instead of slash notation.
+      // For larger chords, use slash notation.
       const highCoverage = matchType === "subset-up" && iLen / pLen >= 0.75;
-      const displayName =
-        (matchType === "exact" || highCoverage) && !rootIsBass
-          ? `${chordName}/${noteNames[bassNote]}`
-          : chordName;
+      const isInvertedTriad = matchType === "exact" && !rootIsBass && pLen === 3;
+      let displayName = chordName;
+      let inversionLabel: string | null = null;
+
+      if (isInvertedTriad) {
+        const INVERSIONS = ["", "1st inv.", "2nd inv."];
+        const bassInterval = (bassNote - root + 12) % 12;
+        const bassPos = pattern.intervals.indexOf(bassInterval);
+        if (bassPos >= 1 && bassPos < INVERSIONS.length) {
+          inversionLabel = INVERSIONS[bassPos];
+        } else {
+          displayName = `${chordName}/${noteNames[bassNote]}`;
+        }
+      } else if ((matchType === "exact" || highCoverage) && !rootIsBass) {
+        displayName = `${chordName}/${noteNames[bassNote]}`;
+      }
+
+      // Compute missing notes: pattern intervals not in played intervals
+      const missing: number[] = [];
+      if (matchType === "subset-up") {
+        for (const pi of pattern.intervals) {
+          if (!intervals.includes(pi)) {
+            missing.push((pi + root) % 12);
+          }
+        }
+      }
 
       interpretations.push({
         name: displayName,
@@ -206,12 +256,14 @@ export function detectChord(notes: Set<number>, noteNames: string[] = DEFAULT_NO
         suffix: pattern.suffix,
         score,
         exact: matchType === "exact",
+        inversion: inversionLabel,
+        missingNotes: missing,
       });
     }
   }
 
   if (interpretations.length === 0) {
-    return { name: "?", root: -1, suffix: "", exact: false, alternatives: [] };
+    return { name: "?", root: -1, suffix: "", exact: false, inversion: null, missingNotes: [], alternatives: [] };
   }
 
   // Sort by score descending
@@ -252,53 +304,51 @@ export function detectChord(notes: Set<number>, noteNames: string[] = DEFAULT_NO
     if (alternatives.length >= 2) break;
   }
 
-  // If the primary uses slash notation (root ≠ bass), check if the bass note
-  // is a chord tone and add an inversion label as an alternative.
-  // Only for triads (3 notes) and 7th chords (4 notes) where inversions
-  // are well-defined in music theory.
-  if (primary.name.includes("/") && primary.exact) {
-    const INVERSION_NAMES = ["", "1st inv.", "2nd inv.", "3rd inv."];
-    // Find the matching pattern to determine bass position
-    const slashIdx = primary.name.indexOf("/");
-    const chordPart = primary.name.slice(0, slashIdx);
+  // Add contextual alternative based on whether primary uses inversion or slash:
+  // - Triads with inversion label as primary → add slash version as alternative
+  // - Slash chords as primary → add inversion/bass-tone description as alternative
+  if (primary.exact) {
+    if (primary.inversion) {
+      // Primary is a triad inversion — add slash notation as alternative
+      const slashAlt = `${primary.name}/${noteNames[bassNote]}`;
+      if (!alternatives.includes(slashAlt)) {
+        alternatives.unshift(slashAlt);
+        if (alternatives.length > 3) alternatives.pop();
+      }
+    } else if (primary.name.includes("/")) {
+      // Primary uses slash notation — add inversion/bass description as alternative
+      const slashIdx = primary.name.indexOf("/");
+      const chordPart = primary.name.slice(0, slashIdx);
 
-    for (const root of pitchClasses) {
-      const rootName = noteNames[root];
-      // Find the suffix by stripping the root name
-      if (!chordPart.startsWith(rootName)) continue;
-      const suffix = chordPart.slice(rootName.length);
-      // Check if this suffix matches a pattern, and if so, where the bass sits
-      const intervals = pitchClasses
-        .map((pc) => (pc - root + 12) % 12)
-        .sort((a, b) => a - b);
-      const bassInterval = (bassNote - root + 12) % 12;
+      for (const root of pitchClasses) {
+        const rootName = noteNames[root];
+        if (!chordPart.startsWith(rootName)) continue;
+        const suffix = chordPart.slice(rootName.length);
+        const intervals = pitchClasses
+          .map((pc) => (pc - root + 12) % 12)
+          .sort((a, b) => a - b);
+        const bassInterval = (bassNote - root + 12) % 12;
 
-      for (const pattern of CHORD_PATTERNS) {
-        if (pattern.suffix !== suffix) continue;
-        if (!arraysEqual(pattern.intervals, intervals)) continue;
-        const bassPos = pattern.intervals.indexOf(bassInterval);
-        if (bassPos >= 1) {
-          // Use standard inversion names for triads/7ths, descriptive for larger chords
-          let invLabel: string;
-          if (bassPos < INVERSION_NAMES.length && pattern.intervals.length <= 4) {
-            invLabel = `${chordPart} (${INVERSION_NAMES[bassPos]})`;
-          } else {
-            // For extended chords, describe which tone is in the bass
+        for (const pattern of CHORD_PATTERNS) {
+          if (pattern.suffix !== suffix) continue;
+          if (!arraysEqual(pattern.intervals, intervals)) continue;
+          const bassPos = pattern.intervals.indexOf(bassInterval);
+          if (bassPos >= 1) {
             const TONE_NAMES: Record<number, string> = {
-              3: "minor 3rd", 4: "major 3rd", 5: "4th", 6: "b5",
-              7: "5th", 8: "b6", 9: "6th", 10: "b7", 11: "maj7", 2: "9th",
+              2: "9th", 3: "minor 3rd", 4: "major 3rd", 5: "4th", 6: "b5",
+              7: "5th", 8: "b6", 9: "6th", 10: "b7", 11: "maj7",
             };
-            const toneName = TONE_NAMES[bassInterval] ?? `bass`;
-            invLabel = `${chordPart} (${toneName} in bass)`;
+            const toneName = TONE_NAMES[bassInterval] ?? "bass";
+            const invLabel = `${chordPart} (${toneName} in bass)`;
+            if (!alternatives.includes(invLabel)) {
+              alternatives.unshift(invLabel);
+              if (alternatives.length > 3) alternatives.pop();
+            }
           }
-          if (!alternatives.includes(invLabel)) {
-            alternatives.unshift(invLabel);
-            if (alternatives.length > 3) alternatives.pop();
-          }
+          break;
         }
         break;
       }
-      break;
     }
   }
 
@@ -324,6 +374,8 @@ export function detectChord(notes: Set<number>, noteNames: string[] = DEFAULT_NO
     root: primary.root,
     suffix: primary.suffix,
     exact: primary.exact,
+    inversion: primary.inversion,
+    missingNotes: primary.missingNotes,
     alternatives,
   };
 }
