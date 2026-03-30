@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback } from "react";
+import { useRef, useEffect, useCallback, useState } from "react";
 
 interface KeyboardProps {
   activeNotes: Set<number>;
@@ -8,30 +8,39 @@ interface KeyboardProps {
   onNoteOff?: (note: number) => void;
 }
 
-const START_OCTAVE = 3;
-const NUM_OCTAVES = 4;
 const WHITE_KEY_PITCHES = [0, 2, 4, 5, 7, 9, 11];
-// xFrac = position in white-key-widths from start of octave.
-// Each black key sits between two white keys: e.g. C# between C (0) and D (1).
 const BLACK_KEYS: { pitch: number; xFrac: number }[] = [
-  { pitch: 1, xFrac: 1.0 },   // C# — between C(0) and D(1)
-  { pitch: 3, xFrac: 2.0 },   // D# — between D(1) and E(2)
-  { pitch: 6, xFrac: 4.0 },   // F# — between F(3) and G(4)
-  { pitch: 8, xFrac: 5.0 },   // G# — between G(4) and A(5)
-  { pitch: 10, xFrac: 6.0 },  // A# — between A(5) and B(6)
+  { pitch: 1, xFrac: 1.0 },
+  { pitch: 3, xFrac: 2.0 },
+  { pitch: 6, xFrac: 4.0 },
+  { pitch: 8, xFrac: 5.0 },
+  { pitch: 10, xFrac: 6.0 },
 ];
 
-function midiForWhiteIndex(i: number): number {
-  const octave = Math.floor(i / 7);
-  if (octave >= NUM_OCTAVES) return (START_OCTAVE + NUM_OCTAVES) * 12;
-  return (START_OCTAVE + octave) * 12 + WHITE_KEY_PITCHES[i % 7];
+function getLayout(width: number) {
+  // 2 octaves on narrow screens (<600px), 4 on wide
+  // startOctave is MIDI octave: MIDI octave 4 = C3, octave 5 = C4
+  if (width < 500) {
+    return { startOctave: 5, numOctaves: 2 }; // C4–C6
+  } else if (width < 800) {
+    return { startOctave: 4, numOctaves: 3 }; // C3–C6
+  }
+  return { startOctave: 4, numOctaves: 4 };   // C3–C7
 }
-
-const TOTAL_WHITE_KEYS = NUM_OCTAVES * 7 + 1;
 
 export default function Keyboard({ activeNotes, suggestedPitchClasses = [], hotkeyLabels, onNoteOn, onNoteOff }: KeyboardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const pressedRef = useRef<number | null>(null);
+  const [layout, setLayout] = useState(() => getLayout(typeof window !== "undefined" ? window.innerWidth : 1200));
+
+  const { startOctave, numOctaves } = layout;
+  const totalWhiteKeys = numOctaves * 7 + 1;
+
+  function midiForWhiteIndex(i: number): number {
+    const octave = Math.floor(i / 7);
+    if (octave >= numOctaves) return (startOctave + numOctaves) * 12;
+    return (startOctave + octave) * 12 + WHITE_KEY_PITCHES[i % 7];
+  }
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -41,13 +50,21 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], hotk
 
     const dpr = window.devicePixelRatio || 1;
     const rect = canvas.getBoundingClientRect();
+
+    // Update layout based on current width
+    const newLayout = getLayout(rect.width);
+    if (newLayout.numOctaves !== numOctaves || newLayout.startOctave !== startOctave) {
+      setLayout(newLayout);
+      return; // will re-render and redraw
+    }
+
     canvas.width = rect.width * dpr;
     canvas.height = rect.height * dpr;
     ctx.scale(dpr, dpr);
 
     const w = rect.width;
     const h = rect.height;
-    const wkw = w / TOTAL_WHITE_KEYS;
+    const wkw = w / totalWhiteKeys;
     const bkw = wkw * 0.62;
     const bkh = h * 0.62;
 
@@ -56,7 +73,7 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], hotk
     const suggestedSet = new Set(suggestedPitchClasses);
 
     // White keys
-    for (let i = 0; i < TOTAL_WHITE_KEYS; i++) {
+    for (let i = 0; i < totalWhiteKeys; i++) {
       const midi = midiForWhiteIndex(i);
       const isActive = activeNotes.has(midi);
       const isSuggested = !isActive && suggestedSet.has(midi % 12);
@@ -73,7 +90,6 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], hotk
       ctx.roundRect(x + 0.5, 0.5, wkw - 1, h - 1, 4);
       ctx.fill();
 
-      // Draw a subtle dot on suggested white keys
       if (isSuggested) {
         ctx.fillStyle = "rgba(59, 130, 246, 0.25)";
         ctx.beginPath();
@@ -89,12 +105,12 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], hotk
       if (midi % 12 === 0) {
         const label = `C${Math.floor(midi / 12) - 1}`;
         ctx.fillStyle = isActive ? "#ffffff" : "#999999";
-        ctx.font = "500 9px ui-monospace, monospace";
+        ctx.font = `500 ${Math.min(9, wkw * 0.35)}px ui-monospace, monospace`;
         ctx.textAlign = "center";
         ctx.fillText(label, x + wkw / 2, h - 6);
       }
 
-      // Hotkey badge on white keys — positioned below the black keys
+      // Hotkey badge
       if (hotkeyLabels && hotkeyLabels[midi]) {
         const label = hotkeyLabels[midi];
         const bx = x + wkw / 2;
@@ -120,9 +136,9 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], hotk
     }
 
     // Black keys
-    for (let octave = 0; octave < NUM_OCTAVES; octave++) {
+    for (let octave = 0; octave < numOctaves; octave++) {
       for (const bk of BLACK_KEYS) {
-        const midi = (START_OCTAVE + octave) * 12 + bk.pitch;
+        const midi = (startOctave + octave) * 12 + bk.pitch;
         const isActive = activeNotes.has(midi);
         const isSuggested = !isActive && suggestedSet.has(midi % 12);
         const x = (octave * 7 + bk.xFrac) * wkw - bkw / 2;
@@ -138,7 +154,6 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], hotk
         ctx.roundRect(x, 0, bkw, bkh, 3);
         ctx.fill();
 
-        // Dot on suggested black keys
         if (isSuggested) {
           ctx.fillStyle = "rgba(59, 130, 246, 0.4)";
           ctx.beginPath();
@@ -146,7 +161,7 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], hotk
           ctx.fill();
         }
 
-        // Hotkey badge on black keys — centered vertically
+        // Hotkey badge
         if (hotkeyLabels && hotkeyLabels[midi]) {
           const label = hotkeyLabels[midi];
           const bx = x + bkw / 2;
@@ -171,7 +186,7 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], hotk
         }
       }
     }
-  }, [activeNotes, suggestedPitchClasses, hotkeyLabels]);
+  }, [activeNotes, suggestedPitchClasses, hotkeyLabels, numOctaves, startOctave, totalWhiteKeys]);
 
   useEffect(() => {
     draw();
@@ -179,7 +194,7 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], hotk
     return () => window.removeEventListener("resize", draw);
   }, [draw]);
 
-  // Hit-test: which MIDI note is at (x, y)?
+  // Hit-test
   const hitTest = useCallback((clientX: number, clientY: number): number | null => {
     const canvas = canvasRef.current;
     if (!canvas) return null;
@@ -188,26 +203,24 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], hotk
     const y = clientY - rect.top;
     const w = rect.width;
     const h = rect.height;
-    const wkw = w / TOTAL_WHITE_KEYS;
+    const wkw = w / totalWhiteKeys;
     const bkw = wkw * 0.62;
     const bkh = h * 0.62;
 
-    // Check black keys first (they're on top)
     if (y < bkh) {
-      for (let octave = 0; octave < NUM_OCTAVES; octave++) {
+      for (let octave = 0; octave < numOctaves; octave++) {
         for (const bk of BLACK_KEYS) {
-          const midi = (START_OCTAVE + octave) * 12 + bk.pitch;
+          const midi = (startOctave + octave) * 12 + bk.pitch;
           const bx = (octave * 7 + bk.xFrac) * wkw - bkw / 2;
           if (x >= bx && x <= bx + bkw) return midi;
         }
       }
     }
 
-    // White keys
     const i = Math.floor(x / wkw);
-    if (i >= 0 && i < TOTAL_WHITE_KEYS) return midiForWhiteIndex(i);
+    if (i >= 0 && i < totalWhiteKeys) return midiForWhiteIndex(i);
     return null;
-  }, []);
+  }, [numOctaves, startOctave, totalWhiteKeys]);
 
   const isDraggingRef = useRef(false);
 
@@ -229,7 +242,6 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], hotk
       if (!isDraggingRef.current) return;
       const note = hitTest(e.clientX, e.clientY);
       if (note !== null && note !== pressedRef.current) {
-        // Release the previous note, play the new one
         if (pressedRef.current !== null) {
           onNoteOff?.(pressedRef.current);
         }
