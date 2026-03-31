@@ -25,7 +25,7 @@ export default function App() {
   const [showRomanNumerals, setShowRomanNumerals] = useState(false);
   const [latchMode, setLatchMode] = useState(false);
   const [suggestMode, setSuggestMode] = useState(true);
-  const [showHotkeys, setShowHotkeys] = useState(false);
+  const [showHotkeys, setShowHotkeys] = useState(true);
   const [showNoteNames, setShowNoteNames] = useState(false);
   const [pedalDown, setPedalDown] = useState(false);
   const [darkMode, setDarkMode] = useState(true);
