@@ -195,8 +195,8 @@ export default function App() {
     o: 73, // C#5
     p: 75, // D#5
     // [: skip (no black between E5-F5)
-    "]": 79, // G5
-    "\\": 80, // G#5
+    "]": 78, // F#5/Gb5 (black key)
+    "\\": 79, // G5 (white key)
   };
   // Reverse map: MIDI note → display key label
   const MIDI_TO_KEY: Record<number, string> = {};
