@@ -25,7 +25,8 @@ export default function App() {
   const [showRomanNumerals, setShowRomanNumerals] = useState(false);
   const [latchMode, setLatchMode] = useState(false);
   const [suggestMode, setSuggestMode] = useState(true);
-  const [showHotkeys, setShowHotkeys] = useState(true);
+  const isMobile = typeof window !== "undefined" && /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const [showHotkeys, setShowHotkeys] = useState(!isMobile);
   const [showNoteNames, setShowNoteNames] = useState(false);
   const [pedalDown, setPedalDown] = useState(false);
   const [darkMode, setDarkMode] = useState(true);
@@ -285,12 +286,14 @@ export default function App() {
       },
       (status) => {
         setMidiStatus(status);
-        // Auto-show hotkeys when no MIDI device is available
-        if (status.state === "unsupported" || status.state === "denied" ||
-            (status.state === "connected" && status.deviceCount === 0)) {
-          setShowHotkeys(true);
-        } else if (status.state === "connected" && status.deviceCount > 0) {
-          setShowHotkeys(false);
+        // Auto-show hotkeys when no MIDI device is available (desktop only)
+        if (!isMobile) {
+          if (status.state === "unsupported" || status.state === "denied" ||
+              (status.state === "connected" && status.deviceCount === 0)) {
+            setShowHotkeys(true);
+          } else if (status.state === "connected" && status.deviceCount > 0) {
+            setShowHotkeys(false);
+          }
         }
       },
     );
