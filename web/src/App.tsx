@@ -166,33 +166,33 @@ export default function App() {
     setActiveNotes(new Set(heldNotesRef.current));
   }, []);
 
-  // QWERTY → MIDI mapping — mirrors piano layout with proper gaps
-  // Home row (A-') = C3–F4, bottom row (Z-/) = C2–E3
-  // Black keys on row above each, skipping E-F and B-C gaps
+  // QWERTY → MIDI mapping — centered on the keyboard display
+  // Home row (A-') = C4–F5, top row = black keys
+  // This places the bindings in the middle of the 4-octave keyboard
   const QWERTY_MAP: Record<string, number> = {
-    // ── Home row: white keys C3–F4 ──
-    a: 48, // C3
-    s: 50, // D3
-    d: 52, // E3
-    f: 53, // F3
-    g: 55, // G3
-    h: 57, // A3
-    j: 59, // B3
-    k: 60, // C4 (middle C)
-    l: 62, // D4
-    ";": 64, // E4
-    "'": 65, // F4
-    // ── Top row: black keys for home row (gaps at E-F, B-C) ──
-    w: 49, // C#3
-    e: 51, // D#3
-    // r: skip (no black between E3-F3)
-    t: 54, // F#3
-    y: 56, // G#3
-    u: 58, // A#3
-    // i: skip (no black between B3-C4)
-    o: 61, // C#4
-    p: 63, // D#4
-    // [: skip (no black between E4-F4)
+    // ── Home row: white keys C4–F5 ──
+    a: 60, // C4 (middle C)
+    s: 62, // D4
+    d: 64, // E4
+    f: 65, // F4
+    g: 67, // G4
+    h: 69, // A4
+    j: 71, // B4
+    k: 72, // C5
+    l: 74, // D5
+    ";": 76, // E5
+    "'": 77, // F5
+    // ── Top row: black keys (gaps at E-F, B-C) ──
+    w: 61, // C#4
+    e: 63, // D#4
+    // r: skip (no black between E4-F4)
+    t: 66, // F#4
+    y: 68, // G#4
+    u: 70, // A#4
+    // i: skip (no black between B4-C5)
+    o: 73, // C#5
+    p: 75, // D#5
+    // [: skip (no black between E5-F5)
   };
   // Reverse map: MIDI note → display key label
   const MIDI_TO_KEY: Record<number, string> = {};
