@@ -283,7 +283,16 @@ export default function App() {
         sustainOn: handleSustainOn,
         sustainOff: handleSustainOff,
       },
-      setMidiStatus,
+      (status) => {
+        setMidiStatus(status);
+        // Auto-show hotkeys when no MIDI device is available
+        if (status.state === "unsupported" || status.state === "denied" ||
+            (status.state === "connected" && status.deviceCount === 0)) {
+          setShowHotkeys(true);
+        } else if (status.state === "connected" && status.deviceCount > 0) {
+          setShowHotkeys(false);
+        }
+      },
     );
   }, [handleNoteOn, handleNoteOff, handleAllNotesOff, handleSustainOn, handleSustainOff]);
 
