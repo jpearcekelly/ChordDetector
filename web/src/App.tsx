@@ -195,11 +195,13 @@ export default function App() {
     o: 73, // C#5
     p: 75, // D#5
     // [: skip (no black between E5-F5)
+    "]": 79, // G5
+    "\\": 80, // G#5
   };
   // Reverse map: MIDI note → display key label
   const MIDI_TO_KEY: Record<number, string> = {};
   for (const [key, midi] of Object.entries(QWERTY_MAP)) {
-    MIDI_TO_KEY[midi] = key === ";" ? ";" : key === "'" ? "'" : key.toUpperCase();
+    MIDI_TO_KEY[midi] = key === ";" ? ";" : key === "'" ? "'" : key === "]" ? "]" : key === "\\" ? "\\" : key.toUpperCase();
   }
 
   const qwertyHeldRef = useRef<Set<string>>(new Set());

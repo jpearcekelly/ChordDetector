@@ -81,6 +81,8 @@ const CHORD_PATTERNS: ChordPattern[] = [
   { intervals: [0, 4, 8], suffix: "aug", priority: 9 },
   { intervals: [0, 2, 7], suffix: "sus2", priority: 8 },
   { intervals: [0, 5, 7], suffix: "sus4", priority: 8 },
+  { intervals: [0, 4, 6], suffix: "(b5)", priority: 7 },
+  { intervals: [0, 3, 8], suffix: "m(#5)", priority: 6 },
 
   // ── 2-note ────────────────────────────────────
   { intervals: [0, 7], suffix: "5", priority: 6 },

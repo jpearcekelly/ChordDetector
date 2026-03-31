@@ -169,9 +169,9 @@ body {
 }
 
 .pill.missing {
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.2);
-  border: 1px dashed rgba(255, 255, 255, 0.12);
+  background: var(--btn-bg);
+  color: var(--text-subtle);
+  border: 1px dashed var(--btn-border);
   animation: none;
 }
 

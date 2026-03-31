@@ -84,16 +84,16 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], hotk
       if (isActive) {
         ctx.fillStyle = "rgba(59, 130, 246, 0.55)";
       } else if (isSuggested) {
-        ctx.fillStyle = "rgba(255, 255, 255, 0.75)";
+        ctx.fillStyle = darkMode ? "rgba(200, 210, 255, 0.85)" : "rgba(59, 130, 246, 0.12)";
       } else {
-        ctx.fillStyle = "#ffffff";
+        ctx.fillStyle = darkMode ? "#ffffff" : "#fcfcfc";
       }
       ctx.beginPath();
       ctx.roundRect(x + 0.5, 0.5, wkw - 1, h - 1, 4);
       ctx.fill();
 
       if (isSuggested) {
-        ctx.fillStyle = "rgba(59, 130, 246, 0.25)";
+        ctx.fillStyle = "rgba(59, 130, 246, 0.35)";
         ctx.beginPath();
         ctx.arc(x + wkw / 2, h * 0.75, 4, 0, Math.PI * 2);
         ctx.fill();
@@ -157,9 +157,9 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], hotk
         if (isActive) {
           ctx.fillStyle = "rgb(59, 130, 246)";
         } else if (isSuggested) {
-          ctx.fillStyle = "rgba(59, 130, 246, 0.2)";
+          ctx.fillStyle = darkMode ? "rgba(59, 130, 246, 0.25)" : "rgba(59, 130, 246, 0.4)";
         } else {
-          ctx.fillStyle = "#1a1a1a";
+          ctx.fillStyle = darkMode ? "#1a1a1a" : "#2a2a2a";
         }
         ctx.beginPath();
         ctx.roundRect(x, 0, bkw, bkh, 3);
