@@ -4,6 +4,8 @@ interface KeyboardProps {
   activeNotes: Set<number>;
   suggestedPitchClasses?: number[]; // pitch classes to highlight as ghost notes
   hotkeyLabels?: Record<number, string>; // MIDI note → key label to show on keys
+  noteNameLabels?: string[]; // 12-element array of note names indexed by pitch class
+  darkMode?: boolean;
   onNoteOn?: (note: number) => void;
   onNoteOff?: (note: number) => void;
 }
@@ -28,7 +30,7 @@ function getLayout(width: number) {
   return { startOctave: 4, numOctaves: 4 };   // C3–C7
 }
 
-export default function Keyboard({ activeNotes, suggestedPitchClasses = [], hotkeyLabels, onNoteOn, onNoteOff }: KeyboardProps) {
+export default function Keyboard({ activeNotes, suggestedPitchClasses = [], hotkeyLabels, noteNameLabels, darkMode = true, onNoteOn, onNoteOff }: KeyboardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const pressedRef = useRef<number | null>(null);
   const [layout, setLayout] = useState(() => getLayout(typeof window !== "undefined" ? window.innerWidth : 1200));
@@ -133,6 +135,15 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], hotk
         ctx.fillText(label, bx, by);
         ctx.textBaseline = "alphabetic";
       }
+
+      // Note name label on white keys
+      if (noteNameLabels) {
+        const noteName = noteNameLabels[midi % 12];
+        ctx.fillStyle = isActive ? "rgba(255,255,255,0.8)" : "rgba(0,0,0,0.2)";
+        ctx.font = `500 ${Math.min(10, wkw * 0.38)}px system-ui, sans-serif`;
+        ctx.textAlign = "center";
+        ctx.fillText(noteName, x + wkw / 2, h - 18);
+      }
     }
 
     // Black keys
@@ -184,9 +195,18 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], hotk
           ctx.fillText(label, bx, by);
           ctx.textBaseline = "alphabetic";
         }
+
+        // Note name label on black keys
+        if (noteNameLabels) {
+          const noteName = noteNameLabels[midi % 12];
+          ctx.fillStyle = isActive ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.4)";
+          ctx.font = `500 ${Math.min(9, bkw * 0.35)}px system-ui, sans-serif`;
+          ctx.textAlign = "center";
+          ctx.fillText(noteName, x + bkw / 2, bkh - 6);
+        }
       }
     }
-  }, [activeNotes, suggestedPitchClasses, hotkeyLabels, numOctaves, startOctave, totalWhiteKeys]);
+  }, [activeNotes, suggestedPitchClasses, hotkeyLabels, noteNameLabels, darkMode, numOctaves, startOctave, totalWhiteKeys]);
 
   useEffect(() => {
     draw();

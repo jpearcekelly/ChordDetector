@@ -26,7 +26,9 @@ export default function App() {
   const [latchMode, setLatchMode] = useState(false);
   const [suggestMode, setSuggestMode] = useState(true);
   const [showHotkeys, setShowHotkeys] = useState(false);
+  const [showNoteNames, setShowNoteNames] = useState(false);
   const [pedalDown, setPedalDown] = useState(false);
+  const [darkMode, setDarkMode] = useState(true);
 
   // Track sustain pedal state and which notes are being sustained
   const sustainRef = useRef(false);
@@ -293,7 +295,7 @@ export default function App() {
     : null;
 
   return (
-    <div className="app">
+    <div className={`app ${darkMode ? "dark" : "light"}`}>
       <div className="chord-display">
         {hasNotes ? (
           <div className="chord-name-row">
@@ -356,6 +358,8 @@ export default function App() {
           activeNotes={activeNotes}
           suggestedPitchClasses={suggestMode ? chord.missingNotes : []}
           hotkeyLabels={showHotkeys ? MIDI_TO_KEY : undefined}
+          noteNameLabels={showNoteNames ? noteNames : undefined}
+          darkMode={darkMode}
           onNoteOn={(n) => handleNoteOn(n)}
           onNoteOff={handleNoteOff}
         />
@@ -421,6 +425,20 @@ export default function App() {
           <span className={`tool-btn pedal-indicator ${pedalDown ? "active" : ""}`}>
             Pedal <span className="shortcut">Space</span>
           </span>
+          <button
+            className={`tool-btn ${showNoteNames ? "active" : ""}`}
+            onClick={() => setShowNoteNames((v) => !v)}
+            title="Show note names on keys"
+          >
+            Notes
+          </button>
+          <button
+            className="tool-btn"
+            onClick={() => setDarkMode((v) => !v)}
+            title="Toggle light/dark mode"
+          >
+            {darkMode ? "Light" : "Dark"}
+          </button>
 
           <div className="key-selector">
             <label htmlFor="key-select">Key:</label>
