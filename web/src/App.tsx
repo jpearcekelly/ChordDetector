@@ -2,8 +2,11 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Keyboard from "./components/Keyboard";
 import { detectChord, noteName } from "./lib/chordDetector";
 import { initMIDI, type MIDIStatus } from "./lib/midiEngine";
-import { detectKey, noteNamesForKey, formatKey, allKeys, romanNumeral, type Key } from "./lib/keyDetector";
+import { detectKey, noteNamesForKey, formatKey, allKeys, romanNumeral, scaleNotes, SCALE_MODES, type Key, type ScaleMode } from "./lib/keyDetector";
 import * as audio from "./lib/audioEngine";
+import { startMic, stopMic, type MicStatus } from "./lib/micEngine";
+import Ripples from "./components/Ripples";
+import Particles from "./components/Particles";
 import "./App.css";
 
 const ALL_KEYS = allKeys();
@@ -11,9 +14,10 @@ const ALL_KEYS = allKeys();
 export default function App() {
   const [activeNotes, setActiveNotes] = useState<Set<number>>(new Set());
   const [midiStatus, setMidiStatus] = useState<MIDIStatus>({ state: "pending" });
+  const [samplesLoaded, setSamplesLoaded] = useState(audio.isSamplerLoaded());
 
   // Key detection state
-  const [keyMode, setKeyMode] = useState<"auto" | Key>("auto");
+  const [keyMode, setKeyMode] = useState<"none" | "auto" | Key>("none");
   const [detectedKey, setDetectedKey] = useState<Key | null>(null);
   const [lockedKey, setLockedKey] = useState<Key | null>(null); // auto-locked once confident
   const keyConfidenceRef = useRef(0);
@@ -30,6 +34,21 @@ export default function App() {
   const [showNoteNames, setShowNoteNames] = useState(false);
   const [pedalDown, setPedalDown] = useState(false);
   const [darkMode, setDarkMode] = useState(true);
+  const [scrollLocked, setScrollLocked] = useState(false);
+  const [scaleMode, setScaleMode] = useState<ScaleMode | null>(null);
+  const [showRipples, setShowRipples] = useState(false);
+  const [showParticles, setShowParticles] = useState(false);
+  // Incremented on each note-on to trigger particle bursts even for re-struck notes
+  const [noteOnEvent, setNoteOnEvent] = useState<{ note: number; velocity: number; id: number }>({ note: 0, velocity: 0, id: 0 });
+  const [micEnabled, setMicEnabled] = useState(false);
+  const [micStatus, setMicStatus] = useState<MicStatus>("off");
+  const micNotesRef = useRef<Set<number>>(new Set());
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  useEffect(() => {
+    audio.getAudioEngine(); // start loading samples
+    audio.onSamplerLoaded(() => setSamplesLoaded(true));
+  }, []);
 
   // Track sustain pedal state and which notes are being sustained
   const sustainRef = useRef(false);
@@ -39,10 +58,13 @@ export default function App() {
   // Latch mode refs (need refs so callbacks don't go stale)
   const latchRef = useRef(false);
   latchRef.current = latchMode;
+  const micActiveRef = useRef(false);
+  micActiveRef.current = micEnabled && micStatus === "active";
 
   // The active key: manual override > auto-locked > detecting
-  const activeKey = keyMode !== "auto" ? keyMode : (lockedKey ?? detectedKey);
+  const activeKey = keyMode === "none" ? null : keyMode === "auto" ? (lockedKey ?? detectedKey) : keyMode;
   const noteNames = noteNamesForKey(activeKey);
+  const scalePitchClasses = activeKey && scaleMode ? scaleNotes(activeKey.tonic, scaleMode) : [];
 
   // Key detection confidence threshold to auto-lock
   const LOCK_THRESHOLD = 0.25;
@@ -97,31 +119,37 @@ export default function App() {
   }, [runDetection]);
 
   const handleNoteOn = useCallback((note: number, velocity: number = 100) => {
+    const playAudio = !micActiveRef.current; // suppress audio when mic is active
+    if (playAudio) audio.ensureAudioContext();
     // In latch mode, playing a note that's already held toggles it off
     if (latchRef.current) {
       setActiveNotes((prev) => {
         if (prev.has(note)) {
-          audio.noteOff(note);
+          if (playAudio) audio.noteOff(note);
           const next = new Set(prev);
           next.delete(note);
           return next;
         }
-        audio.noteOn(note, velocity);
+        if (playAudio) audio.noteOn(note, velocity);
         return new Set(prev).add(note);
       });
     } else {
       // Re-trigger audio even if note is already sustained by pedal
-      audio.noteOff(note);
-      audio.noteOn(note, velocity);
+      if (playAudio) {
+        audio.noteOff(note);
+        audio.noteOn(note, velocity);
+      }
       setActiveNotes((prev) => new Set(prev).add(note));
     }
     heldNotesRef.current.add(note);
     sustainedNotesRef.current.delete(note);
     updateHistogram(note);
+    setNoteOnEvent({ note, velocity, id: Date.now() });
   }, [updateHistogram]);
 
   const handleNoteOff = useCallback((note: number) => {
     heldNotesRef.current.delete(note);
+    const playAudio = !micActiveRef.current;
 
     // In latch mode, don't release notes
     if (latchRef.current) return;
@@ -129,7 +157,7 @@ export default function App() {
     if (sustainRef.current) {
       sustainedNotesRef.current.add(note);
     } else {
-      audio.noteOff(note);
+      if (playAudio) audio.noteOff(note);
       setActiveNotes((prev) => {
         const next = new Set(prev);
         next.delete(note);
@@ -169,35 +197,33 @@ export default function App() {
     setActiveNotes(new Set(heldNotesRef.current));
   }, []);
 
-  // QWERTY → MIDI mapping — centered on the keyboard display
-  // Home row (A-') = C4–F5, top row = black keys
-  // This places the bindings in the middle of the 4-octave keyboard
+  // QWERTY → MIDI mapping — H = middle C (C4)
+  // Home row (A-') = E3–A4, top row = black keys
   const QWERTY_MAP: Record<string, number> = {
-    // ── Home row: white keys C4–F5 ──
-    a: 60, // C4 (middle C)
-    s: 62, // D4
-    d: 64, // E4
-    f: 65, // F4
-    g: 67, // G4
-    h: 69, // A4
-    j: 71, // B4
-    k: 72, // C5
-    l: 74, // D5
-    ";": 76, // E5
-    "'": 77, // F5
+    // ── Home row: white keys E3–A4 ──
+    a: 52, // E3
+    s: 53, // F3
+    d: 55, // G3
+    f: 57, // A3
+    g: 59, // B3
+    h: 60, // C4 (middle C)
+    j: 62, // D4
+    k: 64, // E4
+    l: 65, // F4
+    ";": 67, // G4
+    "'": 69, // A4
     // ── Top row: black keys (gaps at E-F, B-C) ──
-    w: 61, // C#4
-    e: 63, // D#4
-    // r: skip (no black between E4-F4)
-    t: 66, // F#4
-    y: 68, // G#4
-    u: 70, // A#4
-    // i: skip (no black between B4-C5)
-    o: 73, // C#5
-    p: 75, // D#5
-    // [: skip (no black between E5-F5)
-    "]": 78, // F#5/Gb5 (black key)
-    "\\": 79, // G5 (white key)
+    // w: skip (no black between E3-F3)
+    e: 54, // F#3
+    r: 56, // G#3
+    t: 58, // A#3
+    // y: skip (no black between B3-C4)
+    u: 61, // C#4
+    i: 63, // D#4
+    // o: skip (no black between E4-F4)
+    p: 66, // F#4
+    "[": 68, // G#4
+    "]": 70, // A#4
   };
   // Reverse map: MIDI note → display key label
   const MIDI_TO_KEY: Record<number, string> = {};
@@ -299,6 +325,35 @@ export default function App() {
     );
   }, [handleNoteOn, handleNoteOff, handleAllNotesOff, handleSustainOn, handleSustainOff]);
 
+  // Mic toggle
+  useEffect(() => {
+    if (micEnabled) {
+      startMic({
+        onNotesChanged: (detected) => {
+          const prev = micNotesRef.current;
+          // Notes that appeared
+          for (const note of detected) {
+            if (!prev.has(note)) handleNoteOn(note, 80);
+          }
+          // Notes that disappeared
+          for (const note of prev) {
+            if (!detected.has(note)) handleNoteOff(note);
+          }
+          micNotesRef.current = new Set(detected);
+        },
+        onStatusChange: setMicStatus,
+      });
+    } else {
+      stopMic();
+      // Release any mic-held notes
+      for (const note of micNotesRef.current) {
+        handleNoteOff(note);
+      }
+      micNotesRef.current.clear();
+    }
+    return () => { if (micEnabled) stopMic(); };
+  }, [micEnabled, handleNoteOn, handleNoteOff]);
+
   const chord = detectChord(activeNotes, noteNames, activeKey);
   const sortedNotes = [...activeNotes].sort((a, b) => a - b);
   const hasNotes = activeNotes.size > 0;
@@ -310,7 +365,219 @@ export default function App() {
 
   return (
     <div className={`app ${darkMode ? "dark" : "light"}`}>
-      <div className="chord-display">
+      <div className="status-bar">
+        <span className="status-left">
+          <div className="key-selector">
+            <label htmlFor="input-select">Input:</label>
+            <div className="key-select-wrapper">
+              <select
+                id="input-select"
+                value={micEnabled ? "mic" : "midi"}
+                onChange={(e) => {
+                  if (e.target.value === "mic") {
+                    setMicEnabled(true);
+                  } else {
+                    setMicEnabled(false);
+                  }
+                }}
+              >
+                <option value="midi">
+                  {midiStatus.state === "connected" && midiStatus.deviceCount > 0
+                    ? `MIDI (${midiStatus.deviceCount} device${midiStatus.deviceCount > 1 ? "s" : ""})`
+                    : midiStatus.state === "connected" && midiStatus.deviceCount === 0
+                    ? "MIDI (no devices)"
+                    : midiStatus.state === "pending" ? "MIDI (connecting…)"
+                    : midiStatus.state === "unsupported" ? "On-screen keyboard"
+                    : "MIDI (denied)"}
+                </option>
+                <option value="mic">
+                  {micStatus === "active" ? "Microphone (active)"
+                    : micStatus === "requesting" ? "Microphone (requesting…)"
+                    : micStatus === "denied" ? "Microphone (denied)"
+                    : "Microphone"}
+                </option>
+              </select>
+            </div>
+          </div>
+        </span>
+
+        <div className="toolbar">
+          {/* ── Primary controls ── */}
+          <button
+            className={`tool-btn ${latchMode ? "active" : ""}`}
+            onClick={() => {
+              setLatchMode((v) => {
+                if (v) clearLatch();
+                return !v;
+              });
+            }}
+            title="Key Lock — notes stay held (⇧L)"
+          >
+            Lock <span className="shortcut">&#8679;L</span>
+          </button>
+          {showHotkeys && (
+            <span className={`tool-btn pedal-indicator ${pedalDown ? "active" : ""}`}>
+              Pedal <span className="shortcut">Space</span>
+            </span>
+          )}
+          <div className="key-selector">
+            <label htmlFor="key-select">Key:</label>
+            <div className="key-select-wrapper">
+              <select
+                id="key-select"
+                value={keyMode === "none" ? "none" : keyMode === "auto" ? "auto" : `${keyMode.tonic}-${keyMode.mode}`}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === "none") {
+                    setKeyMode("none");
+                  } else if (val === "auto") {
+                    setKeyMode("auto");
+                    setLockedKey(null);
+                    histogramRef.current = new Array(12).fill(0);
+                  } else {
+                    const [tonic, mode] = val.split("-");
+                    setKeyMode({ tonic: Number(tonic), mode: mode as "major" | "minor" });
+                  }
+                }}
+              >
+                <option value="none">None</option>
+                <option value="auto">
+                  Auto{lockedKey ? ` · ${formatKey(lockedKey)}` : detectedKey ? ` · ${formatKey(detectedKey)}…` : ""}
+                </option>
+                <optgroup label="Major">
+                  {ALL_KEYS.filter((k) => k.mode === "major").map((k) => (
+                    <option key={`${k.tonic}-${k.mode}`} value={`${k.tonic}-${k.mode}`}>
+                      {formatKey(k)}
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Minor">
+                  {ALL_KEYS.filter((k) => k.mode === "minor").map((k) => (
+                    <option key={`${k.tonic}-${k.mode}`} value={`${k.tonic}-${k.mode}`}>
+                      {formatKey(k)}
+                    </option>
+                  ))}
+                </optgroup>
+              </select>
+            </div>
+          </div>
+
+          {/* ── Scale selector — only when a specific key is set ── */}
+          {activeKey && (
+            <div className="key-selector">
+              <label htmlFor="scale-select">Scale:</label>
+              <div className="key-select-wrapper">
+                <select
+                  id="scale-select"
+                  value={scaleMode ? scaleMode.name : "off"}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === "off") {
+                      setScaleMode(null);
+                    } else {
+                      setScaleMode(SCALE_MODES.find((m) => m.name === val) ?? null);
+                    }
+                  }}
+                >
+                  <option value="off">Off</option>
+                  <optgroup label="Modes">
+                    {SCALE_MODES.filter((m) => m.category === "diatonic").map((m) => (
+                      <option key={m.name} value={m.name}>{m.name}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Minor Variants">
+                    {SCALE_MODES.filter((m) => m.category === "minor-variant").map((m) => (
+                      <option key={m.name} value={m.name}>{m.name}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Pentatonic / Blues">
+                    {SCALE_MODES.filter((m) => m.category === "pentatonic").map((m) => (
+                      <option key={m.name} value={m.name}>{m.name}</option>
+                    ))}
+                  </optgroup>
+                </select>
+              </div>
+            </div>
+          )}
+
+          {/* ── Gear menu ── */}
+          <div className="settings-menu">
+            <button
+              className={`tool-btn settings-toggle ${settingsOpen ? "active" : ""}`}
+              onClick={() => setSettingsOpen((v) => !v)}
+              title="More settings"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
+            </button>
+            {settingsOpen && (
+              <>
+                <div className="settings-backdrop" onClick={() => setSettingsOpen(false)} />
+                <div className="settings-popover">
+                  <button
+                    className={`settings-item ${suggestMode ? "active" : ""}`}
+                    onClick={() => setSuggestMode((v) => !v)}
+                  >
+                    Suggestions <span className="shortcut">&#8679;S</span>
+                  </button>
+                  <button
+                    className={`settings-item ${showRomanNumerals ? "active" : ""}`}
+                    onClick={() => setShowRomanNumerals((v) => !v)}
+                  >
+                    Roman Numerals <span className="shortcut">&#8679;N</span>
+                  </button>
+                  <button
+                    className={`settings-item ${showHotkeys ? "active" : ""}`}
+                    onClick={() => setShowHotkeys((v) => !v)}
+                  >
+                    Hotkeys <span className="shortcut">&#8679;H</span>
+                  </button>
+                  <button
+                    className={`settings-item ${showNoteNames ? "active" : ""}`}
+                    onClick={() => setShowNoteNames((v) => !v)}
+                  >
+                    Note Names
+                  </button>
+                  <button
+                    className={`settings-item ${scrollLocked ? "active" : ""}`}
+                    onClick={() => setScrollLocked((v) => !v)}
+                  >
+                    Lock Keyboard
+                  </button>
+                  <button
+                    className={`settings-item ${showRipples ? "active" : ""}`}
+                    onClick={() => setShowRipples((v) => !v)}
+                  >
+                    Ripples
+                  </button>
+                  <button
+                    className={`settings-item ${showParticles ? "active" : ""}`}
+                    onClick={() => setShowParticles((v) => !v)}
+                  >
+                    Particles
+                  </button>
+                  <button
+                    className={`settings-item ${!darkMode ? "active" : ""}`}
+                    onClick={() => setDarkMode((v) => !v)}
+                  >
+                    Light Mode
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="chord-display" style={{ position: "relative" }}>
+        {showRipples && (
+          <Ripples noteOnEvent={noteOnEvent} chordSuffix={chord.suffix} chordExact={chord.exact} darkMode={darkMode} />
+        )}
+        {showParticles && (
+          <Particles activeNotes={activeNotes} noteOnEvent={noteOnEvent} chordSuffix={chord.suffix} chordExact={chord.exact} darkMode={darkMode} />
+        )}
         {hasNotes ? (
           <div className="chord-name-row">
             <h1 className={`chord-name ${chord.exact ? "active" : "uncertain"}`}>
@@ -321,7 +588,12 @@ export default function App() {
             )}
           </div>
         ) : (
-          <div className="empty-state">Play something</div>
+          <div className="empty-state">
+            {!samplesLoaded ? "Loading sounds…"
+              : micStatus === "active" ? "Play your piano…"
+              : midiStatus.state === "connected" && midiStatus.deviceCount > 0 ? "Play something"
+              : "Click the keys or connect a MIDI device"}
+          </div>
         )}
         {roman && (
           <div className="roman-numeral">{roman}</div>
@@ -371,129 +643,16 @@ export default function App() {
         <Keyboard
           activeNotes={activeNotes}
           suggestedPitchClasses={suggestMode ? chord.missingNotes : []}
+          scalePitchClasses={scalePitchClasses}
           hotkeyLabels={showHotkeys ? MIDI_TO_KEY : undefined}
           noteNameLabels={showNoteNames ? noteNames : undefined}
           darkMode={darkMode}
+          scrollLocked={scrollLocked}
           onNoteOn={(n) => handleNoteOn(n)}
           onNoteOff={handleNoteOff}
         />
       </div>
 
-      <div className="status-bar">
-        <span className="status-left">
-          {midiStatus.state === "connected" && midiStatus.deviceCount > 0 && (
-            <span className="status connected">
-              MIDI connected ({midiStatus.deviceCount} device{midiStatus.deviceCount > 1 ? "s" : ""})
-            </span>
-          )}
-          {midiStatus.state === "connected" && midiStatus.deviceCount === 0 && (
-            <span className="status waiting">No MIDI devices — click the keyboard above</span>
-          )}
-          {midiStatus.state === "unsupported" && (
-            <span className="status unsupported">
-              Web MIDI not supported — click the keyboard above (try Chrome for MIDI)
-            </span>
-          )}
-          {midiStatus.state === "denied" && (
-            <span className="status denied">MIDI access denied</span>
-          )}
-          {midiStatus.state === "pending" && (
-            <span className="status pending">Connecting to MIDI…</span>
-          )}
-        </span>
-
-        <div className="toolbar">
-          <button
-            className={`tool-btn ${suggestMode ? "active" : ""}`}
-            onClick={() => setSuggestMode((v) => !v)}
-            title="Show suggested notes to complete the chord (S)"
-          >
-            Suggestions <span className="shortcut">&#8679;S</span>
-          </button>
-          <button
-            className={`tool-btn ${showRomanNumerals ? "active" : ""}`}
-            onClick={() => setShowRomanNumerals((v) => !v)}
-            title="Show Roman numeral analysis (N)"
-          >
-            Numerals <span className="shortcut">&#8679;N</span>
-          </button>
-          <button
-            className={`tool-btn ${latchMode ? "active" : ""}`}
-            onClick={() => {
-              setLatchMode((v) => {
-                if (v) clearLatch(); // turning off — release latched notes
-                return !v;
-              });
-            }}
-            title="Key Lock — notes stay held (press L or double-tap a key)"
-          >
-            Key Lock <span className="shortcut">&#8679;L</span>
-          </button>
-          <button
-            className={`tool-btn ${showHotkeys ? "active" : ""}`}
-            onClick={() => setShowHotkeys((v) => !v)}
-            title="Show keyboard shortcuts on piano keys (Shift+H)"
-          >
-            Hotkeys <span className="shortcut">&#8679;H</span>
-          </button>
-          <span className={`tool-btn pedal-indicator ${pedalDown ? "active" : ""}`}>
-            Pedal <span className="shortcut">Space</span>
-          </span>
-          <button
-            className={`tool-btn ${showNoteNames ? "active" : ""}`}
-            onClick={() => setShowNoteNames((v) => !v)}
-            title="Show note names on keys"
-          >
-            Notes
-          </button>
-          <button
-            className="tool-btn"
-            onClick={() => setDarkMode((v) => !v)}
-            title="Toggle light/dark mode"
-          >
-            {darkMode ? "Light" : "Dark"}
-          </button>
-
-          <div className="key-selector">
-            <label htmlFor="key-select">Key:</label>
-            <div className="key-select-wrapper">
-              <select
-                id="key-select"
-                value={keyMode === "auto" ? "auto" : `${keyMode.tonic}-${keyMode.mode}`}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (val === "auto") {
-                    setKeyMode("auto");
-                    setLockedKey(null);
-                    histogramRef.current = new Array(12).fill(0);
-                  } else {
-                    const [tonic, mode] = val.split("-");
-                    setKeyMode({ tonic: Number(tonic), mode: mode as "major" | "minor" });
-                  }
-                }}
-              >
-                <option value="auto">
-                  Auto{lockedKey ? ` · ${formatKey(lockedKey)}` : detectedKey ? ` · ${formatKey(detectedKey)}…` : ""}
-                </option>
-                <optgroup label="Major">
-                  {ALL_KEYS.filter((k) => k.mode === "major").map((k) => (
-                    <option key={`${k.tonic}-${k.mode}`} value={`${k.tonic}-${k.mode}`}>
-                      {formatKey(k)}
-                    </option>
-                  ))}
-                </optgroup>
-                <optgroup label="Minor">
-                  {ALL_KEYS.filter((k) => k.mode === "minor").map((k) => (
-                    <option key={`${k.tonic}-${k.mode}`} value={`${k.tonic}-${k.mode}`}>
-                      {formatKey(k)}
-                    </option>
-                  ))}
-                </optgroup>
-              </select>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
