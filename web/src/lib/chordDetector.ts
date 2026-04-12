@@ -9,6 +9,22 @@ type ChordPattern = {
   priority: number;
 };
 
+// Common alternative names for chord suffixes (jazz/pop conventions)
+const SUFFIX_ALIASES: Record<string, string> = {
+  "m7b5": "ø7",
+  "dim7": "°7",
+  "dim": "°",
+  "aug": "+",
+  "aug7": "+7",
+  "augMaj7": "+maj7",
+  "mMaj7": "m△7",
+  "mMaj9": "m△9",
+  "maj7": "△7",
+  "maj9": "△9",
+  "maj11": "△11",
+  "maj13": "△13",
+};
+
 const CHORD_PATTERNS: ChordPattern[] = [
   // ── 7-note (13th chords / full voicings) ────────
   { intervals: [0, 2, 4, 5, 7, 9, 10], suffix: "13", priority: 5 },
@@ -368,6 +384,17 @@ export function detectChord(
     if (bassRooted) {
       alternatives.push(bassRooted.name);
       if (alternatives.length > 3) alternatives.shift();
+    }
+  }
+
+  // Add alias name (e.g. ø7 for m7b5, △7 for maj7) as first alternative
+  const alias = SUFFIX_ALIASES[primary.suffix];
+  if (alias) {
+    const rootName = noteNames[primary.root];
+    const aliasName = `${rootName}${alias}`;
+    if (!alternatives.includes(aliasName)) {
+      alternatives.unshift(aliasName);
+      if (alternatives.length > 4) alternatives.pop();
     }
   }
 

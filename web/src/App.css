@@ -5,53 +5,61 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   overflow: hidden;
 }
 
 /* ── Theme variables ───────────────────────────── */
-.app.dark {
-  --bg: #1a1a2e;
-  --text: #e0e0e0;
-  --text-muted: rgba(255, 255, 255, 0.15);
-  --text-subtle: rgba(255, 255, 255, 0.35);
-  --text-faint: rgba(255, 255, 255, 0.12);
-  --border: rgba(255, 255, 255, 0.08);
-  --pill-bg: rgba(59, 130, 246, 0.15);
-  --pill-text: #93c5fd;
-  --alt-text: rgba(255, 255, 255, 0.3);
-  --btn-bg: rgba(255, 255, 255, 0.05);
-  --btn-border: rgba(255, 255, 255, 0.12);
-  --btn-text: rgba(255, 255, 255, 0.4);
-  --btn-hover-border: rgba(255, 255, 255, 0.25);
-  --btn-hover-text: rgba(255, 255, 255, 0.6);
-  --select-bg: rgba(255, 255, 255, 0.08);
-  --select-text: #e0e0e0;
-  --popover-bg: #252540;
-  --popover-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
-  --active-text: #93c5fd;
+.app.light {
+  --bg: #ffffff;
+  --text: #111111;
+  --text-muted: rgba(0, 0, 0, 0.15);
+  --text-subtle: rgba(0, 0, 0, 0.4);
+  --text-faint: rgba(0, 0, 0, 0.08);
+  --border: rgba(0, 0, 0, 0.15);
+  --accent: #d4a843;
+  --accent-bg: rgba(212, 168, 67, 0.12);
+  --pill-bg: rgba(212, 168, 67, 0.15);
+  --pill-text: #96752e;
+  --alt-text: rgba(0, 0, 0, 0.4);
+  --btn-bg: transparent;
+  --btn-border: rgba(0, 0, 0, 0.15);
+  --btn-text: rgba(0, 0, 0, 0.5);
+  --btn-hover-border: rgba(0, 0, 0, 0.35);
+  --btn-hover-text: rgba(0, 0, 0, 0.8);
+  --select-bg: transparent;
+  --select-text: #111111;
+  --popover-bg: #ffffff;
+  --popover-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  --active-text: #96752e;
+  --key-active: #f5edd4;
+  --status-green: #22c55e;
 }
 
-.app.light {
-  --bg: #f5f5f7;
-  --text: #1a1a2e;
-  --text-muted: rgba(0, 0, 0, 0.12);
-  --text-subtle: rgba(0, 0, 0, 0.35);
-  --text-faint: rgba(0, 0, 0, 0.08);
-  --border: rgba(0, 0, 0, 0.08);
-  --pill-bg: rgba(59, 130, 246, 0.1);
-  --pill-text: #2563eb;
-  --alt-text: rgba(0, 0, 0, 0.35);
-  --btn-bg: rgba(0, 0, 0, 0.04);
-  --btn-border: rgba(0, 0, 0, 0.12);
-  --btn-text: rgba(0, 0, 0, 0.45);
-  --btn-hover-border: rgba(0, 0, 0, 0.25);
-  --btn-hover-text: rgba(0, 0, 0, 0.65);
-  --select-bg: rgba(0, 0, 0, 0.05);
-  --select-text: #1a1a2e;
-  --popover-bg: #ffffff;
-  --popover-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
-  --active-text: #2563eb;
+.app.dark {
+  --bg: #0a0a0a;
+  --text: #f0f0f0;
+  --text-muted: rgba(255, 255, 255, 0.15);
+  --text-subtle: rgba(255, 255, 255, 0.4);
+  --text-faint: rgba(255, 255, 255, 0.08);
+  --border: rgba(255, 255, 255, 0.12);
+  --accent: #d4a843;
+  --accent-bg: rgba(212, 168, 67, 0.12);
+  --pill-bg: rgba(212, 168, 67, 0.15);
+  --pill-text: #e0be6a;
+  --alt-text: rgba(255, 255, 255, 0.4);
+  --btn-bg: transparent;
+  --btn-border: rgba(255, 255, 255, 0.12);
+  --btn-text: rgba(255, 255, 255, 0.5);
+  --btn-hover-border: rgba(255, 255, 255, 0.3);
+  --btn-hover-text: rgba(255, 255, 255, 0.8);
+  --select-bg: transparent;
+  --select-text: #f0f0f0;
+  --popover-bg: #141414;
+  --popover-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  --active-text: #e0be6a;
+  --key-active: #2a2518;
+  --status-green: #22c55e;
 }
 
 .app {
@@ -70,7 +78,7 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   padding: 24px 32px;
   gap: 12px;
@@ -94,10 +102,7 @@ body {
 }
 
 .chord-name.active {
-  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--text);
   transform: scale(1.02);
 }
 
@@ -107,7 +112,8 @@ body {
 }
 
 .empty-state {
-  font-size: clamp(20px, 4vw, 32px);
+  font-family: "Space Mono", monospace;
+  font-size: 11px;
   font-weight: 400;
   color: var(--text-faint);
   user-select: none;
@@ -117,7 +123,6 @@ body {
 .chord-name-row {
   display: flex;
   align-items: baseline;
-  justify-content: center;
   gap: 8px;
 }
 
@@ -131,25 +136,25 @@ body {
 }
 
 .roman-numeral {
+  font-family: "Space Mono", monospace;
   font-size: clamp(20px, 4vw, 36px);
-  font-weight: 600;
-  color: rgba(139, 92, 246, 0.6);
+  font-weight: 400;
+  color: var(--accent);
   letter-spacing: 0.02em;
   font-style: italic;
-  font-family: "Times New Roman", Georgia, serif;
   transition: all 0.2s ease;
 }
 
 .alternatives {
   display: flex;
   gap: 16px;
-  justify-content: center;
   min-height: 24px;
 }
 
 .alt-chord {
+  font-family: "Space Grotesk", sans-serif;
   font-size: clamp(16px, 3vw, 24px);
-  font-weight: 500;
+  font-weight: 400;
   color: var(--alt-text);
   letter-spacing: -0.01em;
   transition: all 0.2s ease;
@@ -160,12 +165,11 @@ body {
   gap: 6px;
   min-height: 32px;
   flex-wrap: wrap;
-  justify-content: center;
   align-items: center;
 }
 
 .pill {
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: "Space Mono", monospace;
   font-size: 10px;
   font-weight: 600;
   min-width: 32px;
@@ -180,6 +184,16 @@ body {
   line-height: 32px;
   text-align: center;
   animation: pill-in 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.pill.in-scale {
+  background: rgba(45, 138, 78, 0.15);
+  color: #1a6b3a;
+}
+
+.pill.out-scale {
+  background: rgba(196, 64, 64, 0.12);
+  color: #a03030;
 }
 
 .pill.missing {
@@ -227,13 +241,12 @@ body {
 }
 
 .keyboard-area {
-  padding: 12px 16px;
-  border-top: 1px solid var(--border);
+  padding: 0;
 }
 
 @media (max-width: 600px) {
   .keyboard-area {
-    padding: 8px 4px;
+    padding: 0;
   }
 }
 
@@ -265,20 +278,28 @@ body {
   }
 
   .keyboard-area {
-    padding: 2px 4px;
+    padding: 0;
   }
 
-  .status-bar {
-    padding: 2px 8px;
+  .chrome-bar {
+    font-size: 10px;
   }
 
-  .toolbar {
-    gap: 4px;
+  .chrome-cell {
+    padding: 4px 8px;
   }
 
-  .tool-btn {
-    padding: 2px 6px;
+  .chrome-brand {
+    font-size: 11px;
+  }
+
+  .chrome-select {
+    font-size: 10px;
+  }
+
+  .chrome-btn {
     font-size: 9px;
+    padding: 1px 5px;
   }
 
   .alternatives {
@@ -307,161 +328,151 @@ body {
     padding-bottom: 4px;
   }
 
-  .key-selector select {
-    padding: 2px 16px 2px 6px;
-    font-size: 10px;
-  }
 }
 
-/* ── Status bar ────────────────────────────────── */
-.status-bar {
-  padding: 8px 16px;
+/* ── Chrome bar ────────────────────────────────── */
+.chrome-bar {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 11px;
+  border-bottom: 1px solid var(--border);
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 14px;
 }
 
-@media (max-width: 600px) {
-  .status-bar {
-    flex-direction: column;
-    gap: 6px;
-    padding: 6px 8px;
-  }
-
-  .status-left {
-    display: none;
-  }
-
-  .toolbar {
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-
-  .shortcut {
-    display: none;
-  }
-}
-
-.status {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.status::before {
-  content: "";
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-}
-
-.status.connected::before { background: #22c55e; }
-.status.waiting::before { background: #eab308; }
-.status.unsupported::before { background: #f97316; }
-.status.denied::before { background: #ef4444; }
-.status.pending::before { background: #6b7280; }
-
-.status-left {
-  flex: 1;
-}
-
-.toolbar {
+.chrome-cell {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.tool-btn {
-  font-size: 10px;
-  font-weight: 600;
-  font-family: inherit;
-  padding: 3px 8px;
-  border: 1px solid var(--btn-border);
-  border-radius: 4px;
-  background: var(--btn-bg);
-  color: var(--btn-text);
-  cursor: pointer;
-  transition: all 0.15s ease;
+  padding: 12px 16px;
+  border-right: 1px solid var(--border);
   white-space: nowrap;
 }
 
-.tool-btn:hover {
-  border-color: var(--btn-hover-border);
-  color: var(--btn-hover-text);
+.chrome-cell:last-child {
+  border-right: none;
 }
 
-.tool-btn.active {
-  background: rgba(59, 130, 246, 0.2);
-  border-color: rgba(59, 130, 246, 0.4);
-  color: var(--active-text);
+.chrome-brand {
+  font-family: "Space Grotesk", sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text);
+  letter-spacing: -0.01em;
 }
 
-.shortcut {
-  font-size: 10px;
-  padding: 1px 4px;
-  border-radius: 3px;
-  background: var(--btn-bg);
-  border: 1px solid var(--btn-border);
-  margin-left: 3px;
-  font-family: system-ui, sans-serif;
-  vertical-align: baseline;
-  letter-spacing: 0.5px;
-}
-
-/* ── Key selector ──────────────────────────────── */
-.key-selector {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--btn-text);
-  font-size: 11px;
-}
-
-.key-selector select {
-  appearance: none;
-  background: var(--select-bg);
-  color: var(--select-text);
-  border: 1px solid var(--btn-border);
-  border-radius: 4px;
-  padding: 3px 20px 3px 8px;
-  font-size: 11px;
-  font-family: inherit;
+.chrome-toggle {
+  color: var(--text-subtle);
   cursor: pointer;
+  user-select: none;
+  transition: color 0.15s ease;
+}
+
+.chrome-toggle.active {
+  color: var(--text);
+}
+
+.chrome-shortcut {
+  font-size: 10px;
+  padding: 1px 5px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  margin-left: 4px;
+  opacity: 0.5;
+}
+
+.chrome-spacer {
+  flex: 1;
+  border-right: none;
+}
+
+.chrome-settings {
+  position: relative;
+  border-right: none;
+  border-left: 1px solid var(--border);
+}
+
+/* ── Chrome selects & buttons ───────────────────── */
+.chrome-select {
+  appearance: none;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0;
+  padding-right: 16px;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23999'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 6px center;
+  background-position: right 0 center;
 }
 
-.key-selector select:hover {
-  border-color: var(--btn-hover-border);
+.chrome-select:focus {
+  outline: none;
 }
 
-.key-selector select:focus {
-  outline: 1px solid rgba(59, 130, 246, 0.5);
-  border-color: rgba(59, 130, 246, 0.5);
+.chrome-select-inactive {
+  color: var(--text-subtle);
 }
 
-.key-select-wrapper {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
+.chrome-select-bare {
+  background-image: none;
+  padding-right: 0;
 }
 
-/* ── Settings gear menu ──────────────────────────── */
-.settings-menu {
-  position: relative;
+.chrome-chevron {
+  opacity: 0.35;
+  flex-shrink: 0;
 }
 
-.settings-toggle {
+.chrome-input-cell {
+  cursor: pointer;
+}
+
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-dot.connected {
+  background: #22c55e;
+}
+
+.status-dot.waiting {
+  background: #eab308;
+}
+
+.status-dot.pending {
+  background: #6b7280;
+}
+
+.status-dot.denied {
+  background: #ef4444;
+}
+
+/* ── Settings trigger ──────────────────────────── */
+.settings-trigger {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  padding: 3px 6px;
+  gap: 8px;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0;
 }
 
-.settings-toggle svg {
-  display: block;
+.settings-trigger svg {
+  opacity: 0.4;
+}
+
+/* ── Settings menu ─────────────────────────────── */
+.settings-menu {
+  position: relative;
 }
 
 .settings-backdrop {
@@ -472,11 +483,11 @@ body {
 
 .settings-popover {
   position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
+  top: calc(100% + 12px);
+  right: -16px;
   background: var(--popover-bg);
-  border: 1px solid var(--btn-border);
-  border-radius: 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
   padding: 4px;
   display: flex;
   flex-direction: column;
@@ -490,29 +501,19 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 6px 10px;
+  padding: 8px 12px;
   border: none;
-  border-radius: 4px;
+  border-radius: 3px;
   background: none;
-  color: var(--btn-text);
-  font-size: 11px;
-  font-weight: 500;
-  font-family: inherit;
+  color: var(--text-subtle);
+  font-size: 12px;
+  font-weight: 400;
+  font-family: "Space Mono", monospace;
   cursor: pointer;
   transition: all 0.1s ease;
   white-space: nowrap;
 }
 
-.settings-item:hover {
-  background: var(--btn-bg);
-  color: var(--btn-hover-text);
-}
-
 .settings-item.active {
   color: var(--active-text);
-}
-
-.settings-item .shortcut {
-  font-size: 9px;
-  opacity: 0.6;
 }

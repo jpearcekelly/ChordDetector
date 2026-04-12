@@ -14,7 +14,7 @@ const ALL_KEYS = allKeys();
 export default function App() {
   const [activeNotes, setActiveNotes] = useState<Set<number>>(new Set());
   const [midiStatus, setMidiStatus] = useState<MIDIStatus>({ state: "pending" });
-  const [samplesLoaded, setSamplesLoaded] = useState(audio.isSamplerLoaded());
+  const [_samplesLoaded, setSamplesLoaded] = useState(audio.isSamplerLoaded());
 
   // Key detection state
   const [keyMode, setKeyMode] = useState<"none" | "auto" | Key>("none");
@@ -33,7 +33,7 @@ export default function App() {
   const [showHotkeys, setShowHotkeys] = useState(!isMobile);
   const [showNoteNames, setShowNoteNames] = useState(false);
   const [pedalDown, setPedalDown] = useState(false);
-  const [darkMode, setDarkMode] = useState(true);
+  const [darkMode, setDarkMode] = useState(false);
   const [scrollLocked, setScrollLocked] = useState(false);
   const [scaleMode, setScaleMode] = useState<ScaleMode | null>(null);
   const [showRipples, setShowRipples] = useState(false);
@@ -365,174 +365,184 @@ export default function App() {
 
   return (
     <div className={`app ${darkMode ? "dark" : "light"}`}>
-      <div className="status-bar">
-        <span className="status-left">
-          <div className="key-selector">
-            <label htmlFor="input-select">Input:</label>
-            <div className="key-select-wrapper">
-              <select
-                id="input-select"
-                value={micEnabled ? "mic" : "midi"}
-                onChange={(e) => {
-                  if (e.target.value === "mic") {
-                    setMicEnabled(true);
-                  } else {
-                    setMicEnabled(false);
-                  }
-                }}
-              >
-                <option value="midi">
-                  {midiStatus.state === "connected" && midiStatus.deviceCount > 0
-                    ? `MIDI (${midiStatus.deviceCount} device${midiStatus.deviceCount > 1 ? "s" : ""})`
-                    : midiStatus.state === "connected" && midiStatus.deviceCount === 0
-                    ? "MIDI (no devices)"
-                    : midiStatus.state === "pending" ? "MIDI (connecting…)"
-                    : midiStatus.state === "unsupported" ? "On-screen keyboard"
-                    : "MIDI (denied)"}
-                </option>
-                <option value="mic">
-                  {micStatus === "active" ? "Microphone (active)"
-                    : micStatus === "requesting" ? "Microphone (requesting…)"
-                    : micStatus === "denied" ? "Microphone (denied)"
-                    : "Microphone"}
-                </option>
-              </select>
-            </div>
-          </div>
-        </span>
+      <div className="chrome-bar">
+        <div className="chrome-cell chrome-brand">
+          Tonal
+        </div>
 
-        <div className="toolbar">
-          {/* ── Primary controls ── */}
-          <button
-            className={`tool-btn ${latchMode ? "active" : ""}`}
-            onClick={() => {
-              setLatchMode((v) => {
-                if (v) clearLatch();
-                return !v;
-              });
+        <label className="chrome-cell chrome-input-cell" htmlFor="input-select">
+          <select
+            id="input-select"
+            className="chrome-select chrome-select-bare"
+            value={micEnabled ? "mic" : "midi"}
+            onChange={(e) => {
+              if (e.target.value === "mic") {
+                setMicEnabled(true);
+              } else {
+                setMicEnabled(false);
+              }
+              e.target.blur();
             }}
-            title="Key Lock — notes stay held (⇧L)"
           >
-            Lock <span className="shortcut">&#8679;L</span>
-          </button>
-          {showHotkeys && (
-            <span className={`tool-btn pedal-indicator ${pedalDown ? "active" : ""}`}>
-              Pedal <span className="shortcut">Space</span>
-            </span>
+            <option value="midi">
+              {midiStatus.state === "connected" && midiStatus.deviceCount > 0
+                ? `Midi`
+                : midiStatus.state === "connected" && midiStatus.deviceCount === 0
+                ? "Midi"
+                : midiStatus.state === "pending" ? "Midi"
+                : midiStatus.state === "unsupported" ? "Keyboard"
+                : "Midi"}
+            </option>
+            <option value="mic">Microphone</option>
+          </select>
+          {!micEnabled && midiStatus.state === "connected" && midiStatus.deviceCount > 0 && (
+            <span className="status-dot connected" />
           )}
-          <div className="key-selector">
-            <label htmlFor="key-select">Key:</label>
-            <div className="key-select-wrapper">
-              <select
-                id="key-select"
-                value={keyMode === "none" ? "none" : keyMode === "auto" ? "auto" : `${keyMode.tonic}-${keyMode.mode}`}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (val === "none") {
-                    setKeyMode("none");
-                  } else if (val === "auto") {
-                    setKeyMode("auto");
-                    setLockedKey(null);
-                    histogramRef.current = new Array(12).fill(0);
-                  } else {
-                    const [tonic, mode] = val.split("-");
-                    setKeyMode({ tonic: Number(tonic), mode: mode as "major" | "minor" });
-                  }
-                }}
-              >
-                <option value="none">None</option>
-                <option value="auto">
-                  Auto{lockedKey ? ` · ${formatKey(lockedKey)}` : detectedKey ? ` · ${formatKey(detectedKey)}…` : ""}
+          {!micEnabled && midiStatus.state === "connected" && midiStatus.deviceCount === 0 && (
+            <span className="status-dot waiting" />
+          )}
+          {!micEnabled && midiStatus.state === "pending" && (
+            <span className="status-dot pending" />
+          )}
+          {!micEnabled && midiStatus.state === "denied" && (
+            <span className="status-dot denied" />
+          )}
+          {micEnabled && micStatus === "active" && (
+            <span className="status-dot connected" />
+          )}
+          <svg className="chrome-chevron" width="10" height="6" viewBox="0 0 10 6" fill="currentColor"><path d="M0 0l5 6 5-6z" /></svg>
+        </label>
+
+        <label className="chrome-cell" htmlFor="key-select">
+          <select
+            id="key-select"
+            className={`chrome-select ${keyMode === "none" ? "chrome-select-inactive" : ""}`}
+            value={keyMode === "none" ? "none" : keyMode === "auto" ? "auto" : `${keyMode.tonic}-${keyMode.mode}`}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val === "none") {
+                setKeyMode("none");
+              } else if (val === "auto") {
+                setKeyMode("auto");
+                setLockedKey(null);
+                histogramRef.current = new Array(12).fill(0);
+              } else {
+                const [tonic, mode] = val.split("-");
+                setKeyMode({ tonic: Number(tonic), mode: mode as "major" | "minor" });
+              }
+              e.target.blur();
+            }}
+          >
+            <option value="none">No key</option>
+            <option value="auto">
+              Auto{lockedKey ? ` · ${formatKey(lockedKey)}` : detectedKey ? ` · ${formatKey(detectedKey)}…` : ""}
+            </option>
+            <optgroup label="Major">
+              {ALL_KEYS.filter((k) => k.mode === "major").map((k) => (
+                <option key={`${k.tonic}-${k.mode}`} value={`${k.tonic}-${k.mode}`}>
+                  {formatKey(k)}
                 </option>
-                <optgroup label="Major">
-                  {ALL_KEYS.filter((k) => k.mode === "major").map((k) => (
-                    <option key={`${k.tonic}-${k.mode}`} value={`${k.tonic}-${k.mode}`}>
-                      {formatKey(k)}
-                    </option>
-                  ))}
-                </optgroup>
-                <optgroup label="Minor">
-                  {ALL_KEYS.filter((k) => k.mode === "minor").map((k) => (
-                    <option key={`${k.tonic}-${k.mode}`} value={`${k.tonic}-${k.mode}`}>
-                      {formatKey(k)}
-                    </option>
-                  ))}
-                </optgroup>
-              </select>
-            </div>
+              ))}
+            </optgroup>
+            <optgroup label="Minor">
+              {ALL_KEYS.filter((k) => k.mode === "minor").map((k) => (
+                <option key={`${k.tonic}-${k.mode}`} value={`${k.tonic}-${k.mode}`}>
+                  {formatKey(k)}
+                </option>
+              ))}
+            </optgroup>
+          </select>
+        </label>
+
+        <label className="chrome-cell" htmlFor="scale-select">
+          <select
+            id="scale-select"
+            className={`chrome-select ${!scaleMode ? "chrome-select-inactive" : ""}`}
+            value={scaleMode ? scaleMode.name : "off"}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val === "off") {
+                setScaleMode(null);
+              } else {
+                setScaleMode(SCALE_MODES.find((m) => m.name === val) ?? null);
+                // Default to C major if no key is set
+                if (keyMode === "none") {
+                  setKeyMode({ tonic: 0, mode: "major" });
+                }
+              }
+              e.target.blur();
+            }}
+          >
+            <option value="off">No scale</option>
+            <optgroup label="Modes">
+              {SCALE_MODES.filter((m) => m.category === "diatonic").map((m) => (
+                <option key={m.name} value={m.name}>{m.name}</option>
+              ))}
+            </optgroup>
+            <optgroup label="Minor Variants">
+              {SCALE_MODES.filter((m) => m.category === "minor-variant").map((m) => (
+                <option key={m.name} value={m.name}>{m.name}</option>
+              ))}
+            </optgroup>
+            <optgroup label="Pentatonic / Blues">
+              {SCALE_MODES.filter((m) => m.category === "pentatonic").map((m) => (
+                <option key={m.name} value={m.name}>{m.name}</option>
+              ))}
+            </optgroup>
+          </select>
+        </label>
+
+        <div
+          className={`chrome-cell chrome-toggle ${latchMode ? "active" : ""}`}
+          onClick={() => {
+            setLatchMode((v) => {
+              if (v) clearLatch();
+              return !v;
+            });
+          }}
+          title="Key Lock — notes stay held (⇧L)"
+        >
+          Key lock <span className="chrome-shortcut">Shift+L</span>
+        </div>
+
+        {showHotkeys && (
+          <div className={`chrome-cell chrome-toggle ${pedalDown ? "active" : ""}`}>
+            Pedal <span className="chrome-shortcut">Space</span>
           </div>
+        )}
 
-          {/* ── Scale selector — only when a specific key is set ── */}
-          {activeKey && (
-            <div className="key-selector">
-              <label htmlFor="scale-select">Scale:</label>
-              <div className="key-select-wrapper">
-                <select
-                  id="scale-select"
-                  value={scaleMode ? scaleMode.name : "off"}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (val === "off") {
-                      setScaleMode(null);
-                    } else {
-                      setScaleMode(SCALE_MODES.find((m) => m.name === val) ?? null);
-                    }
-                  }}
-                >
-                  <option value="off">Off</option>
-                  <optgroup label="Modes">
-                    {SCALE_MODES.filter((m) => m.category === "diatonic").map((m) => (
-                      <option key={m.name} value={m.name}>{m.name}</option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="Minor Variants">
-                    {SCALE_MODES.filter((m) => m.category === "minor-variant").map((m) => (
-                      <option key={m.name} value={m.name}>{m.name}</option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="Pentatonic / Blues">
-                    {SCALE_MODES.filter((m) => m.category === "pentatonic").map((m) => (
-                      <option key={m.name} value={m.name}>{m.name}</option>
-                    ))}
-                  </optgroup>
-                </select>
-              </div>
-            </div>
-          )}
+        <div className="chrome-cell chrome-spacer" />
 
-          {/* ── Gear menu ── */}
+        <div
+          className="chrome-cell chrome-settings"
+          onClick={() => setSettingsOpen((v) => !v)}
+          style={{ cursor: "pointer" }}
+        >
           <div className="settings-menu">
-            <button
-              className={`tool-btn settings-toggle ${settingsOpen ? "active" : ""}`}
-              onClick={() => setSettingsOpen((v) => !v)}
-              title="More settings"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="3" />
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-              </svg>
-            </button>
+            <span className="settings-trigger">
+              <svg width="16" height="12" viewBox="0 0 16 12" fill="currentColor"><rect y="0" width="16" height="1.5" rx="0.75" /><rect y="5.25" width="16" height="1.5" rx="0.75" /><rect y="10.5" width="16" height="1.5" rx="0.75" /></svg>
+            </span>
             {settingsOpen && (
               <>
-                <div className="settings-backdrop" onClick={() => setSettingsOpen(false)} />
-                <div className="settings-popover">
+                <div className="settings-backdrop" onClick={(e) => { e.stopPropagation(); setSettingsOpen(false); }} />
+                <div className="settings-popover" onClick={(e) => e.stopPropagation()}>
                   <button
                     className={`settings-item ${suggestMode ? "active" : ""}`}
                     onClick={() => setSuggestMode((v) => !v)}
                   >
-                    Suggestions <span className="shortcut">&#8679;S</span>
+                    Suggestions
                   </button>
                   <button
                     className={`settings-item ${showRomanNumerals ? "active" : ""}`}
                     onClick={() => setShowRomanNumerals((v) => !v)}
                   >
-                    Roman Numerals <span className="shortcut">&#8679;N</span>
+                    Roman Numerals
                   </button>
                   <button
                     className={`settings-item ${showHotkeys ? "active" : ""}`}
                     onClick={() => setShowHotkeys((v) => !v)}
                   >
-                    Hotkeys <span className="shortcut">&#8679;H</span>
+                    Hotkeys
                   </button>
                   <button
                     className={`settings-item ${showNoteNames ? "active" : ""}`}
@@ -559,10 +569,10 @@ export default function App() {
                     Particles
                   </button>
                   <button
-                    className={`settings-item ${!darkMode ? "active" : ""}`}
+                    className={`settings-item ${darkMode ? "active" : ""}`}
                     onClick={() => setDarkMode((v) => !v)}
                   >
-                    Light Mode
+                    Dark Mode
                   </button>
                 </div>
               </>
@@ -587,14 +597,7 @@ export default function App() {
               <span className="inversion-label">{chord.inversion}</span>
             )}
           </div>
-        ) : (
-          <div className="empty-state">
-            {!samplesLoaded ? "Loading sounds…"
-              : micStatus === "active" ? "Play your piano…"
-              : midiStatus.state === "connected" && midiStatus.deviceCount > 0 ? "Play something"
-              : "Click the keys or connect a MIDI device"}
-          </div>
-        )}
+        ) : null}
         {roman && (
           <div className="roman-numeral">{roman}</div>
         )}
@@ -630,11 +633,19 @@ export default function App() {
             // Sort by pitch class relative to the chord root so the chord is in order
             const root = chord.root >= 0 ? chord.root : 0;
             pills.sort((a, b) => ((a.sortPc - root + 12) % 12) - ((b.sortPc - root + 12) % 12));
-            return pills.map((p) => (
-              <span key={p.key} className={`pill ${p.missing ? "missing" : ""}`}>
-                {p.label}
-              </span>
-            ));
+            const scaleSet = new Set(scalePitchClasses);
+            const hasScale = scaleSet.size > 0;
+            return pills.map((p) => {
+              const inScale = hasScale && scaleSet.has(p.sortPc);
+              const pillClass = p.missing ? "missing"
+                : hasScale ? (inScale ? "in-scale" : "out-scale")
+                : "";
+              return (
+                <span key={p.key} className={`pill ${pillClass}`}>
+                  {p.label}
+                </span>
+              );
+            });
           })()}
         </div>
       </div>

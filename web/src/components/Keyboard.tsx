@@ -124,10 +124,35 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], scal
     const suggestedSet = new Set(suggestedPitchClasses);
     const scaleSet = new Set(scalePitchClasses);
 
+    // Create cross-hatch pattern for out-of-scale keys
+    let hatchPattern: CanvasPattern | null = null;
+    let hatchPatternDark: CanvasPattern | null = null;
+    if (scaleSet.size > 0) {
+      const size = 10 * dpr;
+      const makeHatch = (bg: string, lineColor: string) => {
+        const c = document.createElement("canvas");
+        c.width = size;
+        c.height = size;
+        const h = c.getContext("2d")!;
+        h.fillStyle = bg;
+        h.fillRect(0, 0, size, size);
+        h.strokeStyle = lineColor;
+        h.lineWidth = 1;
+        // Single diagonal line from bottom-left to top-right
+        h.beginPath();
+        h.moveTo(0, size);
+        h.lineTo(size, 0);
+        h.stroke();
+        return ctx.createPattern(c, "repeat");
+      };
+      hatchPattern = makeHatch("#ffffff", "rgba(0,0,0,1)");
+      hatchPatternDark = makeHatch("#1a1a1a", "rgba(255,255,255,0.15)");
+    }
+
     // Offset to translate global white-key indices to local ones
     const globalOffset = MIDI_TO_WHITE_IDX.get(visibleWhite[0]) ?? 0;
 
-    // White keys
+    // ── Pass 1: White key fills ──
     for (let i = 0; i < numWhite; i++) {
       const midi = visibleWhite[i];
       const isActive = activeNotes.has(midi);
@@ -135,75 +160,95 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], scal
       const isOutOfScale = scaleSet.size > 0 && !scaleSet.has(midi % 12);
       const x = i * wkw;
 
+      const hasScale = scaleSet.size > 0;
+      const inScale = hasScale && scaleSet.has(midi % 12);
       if (isActive) {
-        ctx.fillStyle = "rgba(59, 130, 246, 0.55)";
+        ctx.fillStyle = hasScale
+          ? (inScale ? "#22c55e" : "#ef4444")
+          : "#eab308";
       } else if (isSuggested) {
-        ctx.fillStyle = darkMode ? "rgba(200, 210, 255, 0.85)" : "rgba(59, 130, 246, 0.12)";
+        ctx.fillStyle = darkMode ? "rgba(212, 168, 67, 0.15)" : "rgba(212, 168, 67, 0.08)";
       } else if (isOutOfScale) {
-        ctx.fillStyle = darkMode ? "#b8b8c0" : "#d4d4d8";
+        const pat = darkMode ? hatchPatternDark : hatchPattern;
+        ctx.fillStyle = pat || (darkMode ? "#2a2a2a" : "#d0d0d0");
       } else {
-        ctx.fillStyle = darkMode ? "#ffffff" : "#fcfcfc";
+        ctx.fillStyle = darkMode ? "#ffffff" : "#ffffff";
       }
+      ctx.fillRect(x, 0, wkw, h);
+    }
+
+    // ── Pass 2: Hairline separators + top border ──
+    ctx.strokeStyle = darkMode ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,1)";
+    ctx.lineWidth = 1;
+    // Top border line
+    ctx.beginPath();
+    ctx.moveTo(0, 0.5);
+    ctx.lineTo(w, 0.5);
+    ctx.stroke();
+    // Key separators
+    for (let i = 1; i < numWhite; i++) {
+      const x = Math.round(i * wkw) + 0.5;
       ctx.beginPath();
-      ctx.roundRect(x + 0.5, 0.5, wkw - 1, h - 1, 4);
-      ctx.fill();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, h);
+      ctx.stroke();
+    }
+
+    // ── Pass 3: White key labels (below black key zone) ──
+    for (let i = 0; i < numWhite; i++) {
+      const midi = visibleWhite[i];
+      const isActive = activeNotes.has(midi);
+      const isSuggested = !isActive && suggestedSet.has(midi % 12);
+      const isOutOfScale = scaleSet.size > 0 && !scaleSet.has(midi % 12);
+      const x = i * wkw;
 
       if (isSuggested) {
-        ctx.fillStyle = "rgba(59, 130, 246, 0.35)";
+        ctx.fillStyle = darkMode ? "rgba(212, 168, 67, 0.5)" : "rgba(212, 168, 67, 0.4)";
         ctx.beginPath();
-        ctx.arc(x + wkw / 2, h * 0.75, 4, 0, Math.PI * 2);
+        ctx.arc(x + wkw / 2, h * 0.75, 3, 0, Math.PI * 2);
         ctx.fill();
       }
 
-      ctx.strokeStyle = "rgba(128, 128, 128, 0.35)";
-      ctx.lineWidth = 0.5;
-      ctx.stroke();
-
       // Label C notes
-      if (midi % 12 === 0) {
+      if (midi % 12 === 0 && !isOutOfScale) {
         const label = `C${Math.floor(midi / 12) - 1}`;
-        ctx.fillStyle = isActive ? "#ffffff" : "#999999";
-        ctx.font = `500 ${Math.min(9, wkw * 0.35)}px ui-monospace, monospace`;
+        ctx.fillStyle = isActive ? "rgba(0,0,0,0.4)" : darkMode ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.2)";
+        ctx.font = `500 ${Math.min(9, wkw * 0.35)}px "Space Mono", monospace`;
         ctx.textAlign = "center";
         ctx.fillText(label, x + wkw / 2, h - 6);
       }
 
       // Hotkey badge
-      if (hotkeyLabels && hotkeyLabels[midi]) {
+      if (hotkeyLabels && hotkeyLabels[midi] && !isOutOfScale) {
         const label = hotkeyLabels[midi];
         const bx = x + wkw / 2;
         const by = bkh + (h - bkh) * 0.45;
         const badgeSize = Math.min(wkw * 0.55, 18);
-        const radius = 3;
 
-        ctx.fillStyle = isActive ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.07)";
+        ctx.fillStyle = isActive ? "rgba(0,0,0,0.06)" : darkMode ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)";
         ctx.beginPath();
-        ctx.roundRect(bx - badgeSize / 2, by - badgeSize / 2, badgeSize, badgeSize, radius);
+        ctx.roundRect(bx - badgeSize / 2, by - badgeSize / 2, badgeSize, badgeSize, 3);
         ctx.fill();
-        ctx.strokeStyle = isActive ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.12)";
-        ctx.lineWidth = 0.5;
-        ctx.stroke();
 
-        ctx.fillStyle = isActive ? "rgba(255,255,255,0.9)" : "rgba(0,0,0,0.3)";
-        ctx.font = `600 ${Math.round(badgeSize * 0.55)}px system-ui, sans-serif`;
+        ctx.fillStyle = isActive ? "rgba(0,0,0,0.4)" : darkMode ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.25)";
+        ctx.font = `600 ${Math.round(badgeSize * 0.55)}px "Space Mono", monospace`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(label, bx, by);
         ctx.textBaseline = "alphabetic";
       }
 
-      // Note name label on white keys
-      if (noteNameLabels) {
+      // Note name label
+      if (noteNameLabels && !isOutOfScale) {
         const noteName = noteNameLabels[midi % 12];
-        ctx.fillStyle = isActive ? "rgba(255,255,255,0.8)" : "rgba(0,0,0,0.2)";
-        ctx.font = `500 ${Math.min(10, wkw * 0.38)}px system-ui, sans-serif`;
+        ctx.fillStyle = isActive ? "rgba(0,0,0,0.35)" : darkMode ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.18)";
+        ctx.font = `500 ${Math.min(10, wkw * 0.38)}px "Space Mono", monospace`;
         ctx.textAlign = "center";
         ctx.fillText(noteName, x + wkw / 2, h - 18);
       }
-
     }
 
-    // Black keys — use precomputed global xPos, shifted by the offset
+    // ── Pass 4: Black keys ──
     for (const bk of visibleBlack) {
       const { midi, xPos } = bk;
       const localXPos = xPos - globalOffset;
@@ -213,59 +258,65 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], scal
       const isOutOfScale = scaleSet.size > 0 && !scaleSet.has(midi % 12);
       const x = localXPos * wkw - bkw / 2;
 
+      const hasScale = scaleSet.size > 0;
+      const inScale = hasScale && scaleSet.has(midi % 12);
       if (isActive) {
-        ctx.fillStyle = "rgb(59, 130, 246)";
+        ctx.fillStyle = hasScale
+          ? (inScale ? "#22c55e" : "#ef4444")
+          : "#eab308";
+        ctx.fillRect(x, 0, bkw, bkh);
       } else if (isSuggested) {
-        ctx.fillStyle = darkMode ? "rgba(59, 130, 246, 0.25)" : "rgba(59, 130, 246, 0.4)";
+        ctx.fillStyle = darkMode ? "rgba(212, 168, 67, 0.35)" : "rgba(212, 168, 67, 0.4)";
+        ctx.fillRect(x, 0, bkw, bkh);
       } else if (isOutOfScale) {
-        ctx.fillStyle = darkMode ? "#555560" : "#8a8a90";
+        const pat = darkMode ? hatchPatternDark : hatchPattern;
+        ctx.fillStyle = pat || (darkMode ? "#2a2a2a" : "#d0d0d0");
+        ctx.fillRect(x, 0, bkw, bkh);
       } else {
-        ctx.fillStyle = darkMode ? "#1a1a1a" : "#2a2a2a";
+        ctx.fillStyle = darkMode ? "#1a1a1a" : "#111111";
+        ctx.fillRect(x, 0, bkw, bkh);
       }
-      ctx.beginPath();
-      ctx.roundRect(x, 0, bkw, bkh, 3);
-      ctx.fill();
+
+      // Black key outline
+      ctx.strokeStyle = darkMode ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,1)";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x + 0.5, 0.5, bkw - 1, bkh - 0.5);
 
       if (isSuggested) {
-        ctx.fillStyle = "rgba(59, 130, 246, 0.4)";
+        ctx.fillStyle = "rgba(212, 168, 67, 0.6)";
         ctx.beginPath();
         ctx.arc(x + bkw / 2, bkh * 0.75, 3, 0, Math.PI * 2);
         ctx.fill();
       }
 
       // Hotkey badge
-      if (hotkeyLabels && hotkeyLabels[midi]) {
+      if (hotkeyLabels && hotkeyLabels[midi] && !isOutOfScale) {
         const label = hotkeyLabels[midi];
         const bx = x + bkw / 2;
         const by = bkh * 0.55;
         const badgeSize = Math.min(bkw * 0.65, 16);
-        const radius = 3;
 
-        ctx.fillStyle = isActive ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.08)";
+        ctx.fillStyle = isActive ? "rgba(0,0,0,0.15)" : "rgba(255,255,255,0.06)";
         ctx.beginPath();
-        ctx.roundRect(bx - badgeSize / 2, by - badgeSize / 2, badgeSize, badgeSize, radius);
+        ctx.roundRect(bx - badgeSize / 2, by - badgeSize / 2, badgeSize, badgeSize, 3);
         ctx.fill();
-        ctx.strokeStyle = isActive ? "rgba(255,255,255,0.35)" : "rgba(255,255,255,0.15)";
-        ctx.lineWidth = 0.5;
-        ctx.stroke();
 
-        ctx.fillStyle = isActive ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.45)";
-        ctx.font = `600 ${Math.round(badgeSize * 0.55)}px system-ui, sans-serif`;
+        ctx.fillStyle = isActive ? "rgba(0,0,0,0.7)" : "rgba(255,255,255,0.35)";
+        ctx.font = `600 ${Math.round(badgeSize * 0.55)}px "Space Mono", monospace`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(label, bx, by);
         ctx.textBaseline = "alphabetic";
       }
 
-      // Note name label on black keys
-      if (noteNameLabels) {
+      // Note name label
+      if (noteNameLabels && !isOutOfScale) {
         const noteName = noteNameLabels[midi % 12];
-        ctx.fillStyle = isActive ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.4)";
-        ctx.font = `500 ${Math.min(9, bkw * 0.35)}px system-ui, sans-serif`;
+        ctx.fillStyle = isActive ? "rgba(0,0,0,0.7)" : "rgba(255,255,255,0.35)";
+        ctx.font = `500 ${Math.min(9, bkw * 0.35)}px "Space Mono", monospace`;
         ctx.textAlign = "center";
         ctx.fillText(noteName, x + bkw / 2, bkh - 6);
       }
-
     }
 
     // Save for hit-testing
