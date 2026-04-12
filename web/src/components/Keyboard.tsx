@@ -1,12 +1,15 @@
 import { useRef, useEffect, useCallback } from "react";
 import { drawHotkeyBadge } from "./HotkeyBadge";
+import { drawNotePill } from "./NotePill";
+import type { PillVariant } from "./NotePill";
 
 interface KeyboardProps {
   activeNotes: Set<number>;
   suggestedPitchClasses?: number[]; // pitch classes to highlight as ghost notes
   scalePitchClasses?: number[]; // pitch classes in the active scale
   hotkeyLabels?: Record<number, string>; // MIDI note → key label to show on keys
-  noteNameLabels?: string[]; // 12-element array of note names indexed by pitch class
+  noteNameLabels?: string[]; // 12-element array of note names indexed by pitch class (all keys)
+  activeNoteNames?: string[]; // 12-element array — always shown on active keys regardless of noteNameLabels
   darkMode?: boolean;
   scrollLocked?: boolean;
   onNoteOn?: (note: number) => void;
@@ -64,13 +67,13 @@ for (let m = MIDI_LOW; m <= MIDI_HIGH; m++) {
 const TOTAL_WHITE = WHITE_KEYS.length; // 52
 
 const isTouchDevice = typeof window !== "undefined" && ("ontouchstart" in window || navigator.maxTouchPoints > 0);
-const TOUCH_MIN_KEY_WIDTH = 44;
+const TOUCH_MIN_KEY_WIDTH = 52;
 
 // Find the white key index of C4 (MIDI 60) for initial scroll centering
 const C4_WHITE_IDX = MIDI_TO_WHITE_IDX.get(60) ?? 23;
 
 
-export default function Keyboard({ activeNotes, suggestedPitchClasses = [], scalePitchClasses = [], hotkeyLabels, noteNameLabels, darkMode = true, scrollLocked = false, onNoteOn, onNoteOff }: KeyboardProps) {
+export default function Keyboard({ activeNotes, suggestedPitchClasses = [], scalePitchClasses = [], hotkeyLabels, noteNameLabels, activeNoteNames, darkMode = true, scrollLocked = false, onNoteOn, onNoteOff }: KeyboardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const pressedRef = useRef<number | null>(null);
@@ -94,17 +97,17 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], scal
     let visibleBlack: typeof BLACK_KEY_LIST;
     let canvasW: number;
 
+    const MIN_KEY_WIDTH = isTouchDevice ? TOUCH_MIN_KEY_WIDTH : 40;
     if (isTouchDevice) {
       // Full 88 keys, scrollable
       visibleWhite = WHITE_KEYS;
       visibleBlack = BLACK_KEY_LIST;
-      canvasW = Math.max(TOTAL_WHITE * TOUCH_MIN_KEY_WIDTH, containerWidth);
     } else {
       // Desktop: fixed 4 octaves, C2 (36) to C6 (84)
       visibleWhite = WHITE_KEYS.filter(m => m >= 36 && m <= 84);
       visibleBlack = BLACK_KEY_LIST.filter(bk => bk.midi >= 36 && bk.midi <= 84);
-      canvasW = containerWidth;
     }
+    canvasW = Math.max(visibleWhite.length * MIN_KEY_WIDTH, containerWidth);
 
     const numWhite = visibleWhite.length;
     const rect = canvas.getBoundingClientRect();
@@ -129,7 +132,8 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], scal
     let hatchPattern: CanvasPattern | null = null;
     let hatchPatternDark: CanvasPattern | null = null;
     if (scaleSet.size > 0) {
-      const size = 6 * dpr;
+      const size = 8 * dpr;
+      const lw = 0.5;
       const makeHatch = (bg: string, lineColor: string) => {
         const c = document.createElement("canvas");
         c.width = size;
@@ -138,15 +142,20 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], scal
         h.fillStyle = bg;
         h.fillRect(0, 0, size, size);
         h.strokeStyle = lineColor;
-        h.lineWidth = 0.5 * dpr;
+        h.lineWidth = lw;
+        // Three segments to ensure seamless tiling at edges
         h.beginPath();
-        h.moveTo(0, size);
-        h.lineTo(size, 0);
+        h.moveTo(-1, size + 1);
+        h.lineTo(size + 1, -1);
+        h.moveTo(-1, 1);
+        h.lineTo(1, -1);
+        h.moveTo(size - 1, size + 1);
+        h.lineTo(size + 1, size - 1);
         h.stroke();
         return ctx.createPattern(c, "repeat");
       };
-      hatchPattern = makeHatch("#ffffff", "rgba(0,0,0,0.25)");
-      hatchPatternDark = makeHatch("#1a1a1a", "rgba(255,255,255,0.12)");
+      hatchPattern = makeHatch("#ffffff", "#000000");
+      hatchPatternDark = makeHatch("#1a1a1a", "rgba(255,255,255,0.2)");
     }
 
     // Offset to translate global white-key indices to local ones
@@ -202,9 +211,20 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], scal
       const isOutOfScale = scaleSet.size > 0 && !scaleSet.has(midi % 12);
       const x = i * wkw;
 
-      // Label C notes
-      if (midi % 12 === 0 && !isOutOfScale) {
-        const label = `C${Math.floor(midi / 12) - 1}`;
+      const octave = Math.floor(midi / 12) - 1;
+
+      // Note name with octave at the bottom — replaces C labels when noteNameLabels is on
+      if (noteNameLabels && !isOutOfScale) {
+        const label = `${noteNameLabels[midi % 12]}${octave}`;
+        ctx.fillStyle = isActive
+          ? (darkMode ? "rgba(0,0,0,0.5)" : "rgba(0,0,0,0.5)")
+          : (darkMode ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.18)");
+        ctx.font = `500 ${Math.min(9, wkw * 0.35)}px "Space Mono", monospace`;
+        ctx.textAlign = "center";
+        ctx.fillText(label, x + wkw / 2, h - 6);
+      } else if (!noteNameLabels && midi % 12 === 0 && !isOutOfScale) {
+        // C labels only when note names are off
+        const label = `C${octave}`;
         ctx.fillStyle = darkMode ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.2)";
         ctx.font = `500 ${Math.min(9, wkw * 0.35)}px "Space Mono", monospace`;
         ctx.textAlign = "center";
@@ -218,13 +238,16 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], scal
         drawHotkeyBadge(ctx, hotkeyLabels[midi], bx, by, Math.min(wkw * 0.65, 22), Math.min(wkw * 0.45, 16), darkMode ? "dark" : "light", isActive);
       }
 
-      // Note name label
-      if (noteNameLabels && !isOutOfScale) {
-        const noteName = noteNameLabels[midi % 12];
-        ctx.fillStyle = darkMode ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.18)";
-        ctx.font = `500 ${Math.min(10, wkw * 0.38)}px "Space Mono", monospace`;
-        ctx.textAlign = "center";
-        ctx.fillText(noteName, x + wkw / 2, h - 18);
+      // Mobile-only: draw note pill on active keys when activeNoteNames is set
+      if (isActive && activeNoteNames && !noteNameLabels) {
+        const names = activeNoteNames;
+        const pillLabel = `${names[midi % 12]}${octave}`;
+        const pillR = Math.min(wkw * 0.35, 16);
+        const scSet = new Set(scalePitchClasses);
+        const variant: PillVariant = scSet.size > 0
+          ? (scSet.has(midi % 12) ? "inScale" : "outScale")
+          : "default";
+        drawNotePill(ctx, pillLabel, x + wkw / 2, bkh + (h - bkh) * 0.5, pillR, variant);
       }
     }
 
@@ -270,19 +293,32 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], scal
         drawHotkeyBadge(ctx, hotkeyLabels[midi], bx, by, Math.min(bkw * 0.75, 20), Math.min(bkw * 0.5, 14), variant, isActive);
       }
 
-      // Note name label
+      const octave = Math.floor(midi / 12) - 1;
+
+      // Note name with octave at the bottom
       if (noteNameLabels && !isOutOfScale) {
-        const noteName = noteNameLabels[midi % 12];
+        const label = `${noteNameLabels[midi % 12]}${octave}`;
         ctx.fillStyle = isActive ? "rgba(0,0,0,0.7)" : "rgba(255,255,255,0.35)";
         ctx.font = `500 ${Math.min(9, bkw * 0.35)}px "Space Mono", monospace`;
         ctx.textAlign = "center";
-        ctx.fillText(noteName, x + bkw / 2, bkh - 6);
+        ctx.fillText(label, x + bkw / 2, bkh - 6);
+      }
+
+      // Mobile-only: draw note pill on active keys
+      if (isActive && activeNoteNames && !noteNameLabels) {
+        const pillLabel = `${activeNoteNames[midi % 12]}${octave}`;
+        const pillR = Math.min(bkw * 0.35, 13);
+        const scSet = new Set(scalePitchClasses);
+        const variant: PillVariant = scSet.size > 0
+          ? (scSet.has(midi % 12) ? "inScale" : "outScale")
+          : "default";
+        drawNotePill(ctx, pillLabel, x + bkw / 2, bkh * 0.5, pillR, variant);
       }
     }
 
     // Save for hit-testing
     visibleStateRef.current = { white: visibleWhite, black: visibleBlack };
-  }, [activeNotes, suggestedPitchClasses, scalePitchClasses, hotkeyLabels, noteNameLabels, darkMode]);
+  }, [activeNotes, suggestedPitchClasses, scalePitchClasses, hotkeyLabels, noteNameLabels, activeNoteNames, darkMode]);
 
   // Scroll to center on middle C (C4) on first render
   useEffect(() => {
@@ -375,7 +411,7 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], scal
   return (
     <div
       ref={scrollRef}
-      className={`keyboard-scroll ${isTouchDevice ? "scrollable" : ""} ${scrollLocked ? "scroll-locked" : ""}`}
+      className={`keyboard-scroll scrollable ${scrollLocked ? "scroll-locked" : ""}`}
     >
       <canvas
         ref={canvasRef}

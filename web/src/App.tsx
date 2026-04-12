@@ -9,11 +9,24 @@ import Ripples from "./components/Ripples";
 import Particles from "./components/Particles";
 import HotkeyBadge from "./components/HotkeyBadge";
 import ChromeSelect from "./components/ChromeSelect";
+import NotePill from "./components/NotePill";
+import type { PillVariant } from "./components/NotePill";
 import "./App.css";
 
 const ALL_KEYS = allKeys();
 
 export default function App() {
+  // Track mobile breakpoint to conditionally show note pills on keys
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== "undefined" && window.matchMedia("(max-width: 768px)").matches
+  );
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 768px)");
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+
   const [activeNotes, setActiveNotes] = useState<Set<number>>(new Set());
   const [midiStatus, setMidiStatus] = useState<MIDIStatus>({ state: "pending" });
   const [_samplesLoaded, setSamplesLoaded] = useState(audio.isSamplerLoaded());
@@ -31,7 +44,6 @@ export default function App() {
   const [showRomanNumerals, setShowRomanNumerals] = useState(false);
   const [latchMode, setLatchMode] = useState(false);
   const [suggestMode, setSuggestMode] = useState(true);
-  const isMobile = typeof window !== "undefined" && /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
   const [showHotkeys, setShowHotkeys] = useState(!isMobile);
   const [showNoteNames, setShowNoteNames] = useState(false);
   const [pedalDown, setPedalDown] = useState(false);
@@ -489,8 +501,12 @@ export default function App() {
           style={{ cursor: "pointer" }}
         >
           <div className="settings-menu">
-            <span className="settings-trigger">
-              <svg width="16" height="12" viewBox="0 0 16 12" fill="currentColor"><rect y="0" width="16" height="1.5" rx="0.75" /><rect y="5.25" width="16" height="1.5" rx="0.75" /><rect y="10.5" width="16" height="1.5" rx="0.75" /></svg>
+            <span className={`settings-trigger ${settingsOpen ? "open" : ""}`}>
+              <svg width="18" height="14" viewBox="0 0 18 14" fill="currentColor">
+                <rect className="burger-line burger-top" x="0" y="0" width="18" height="1.5" rx="0.75" />
+                <rect className="burger-line burger-mid" x="0" y="6.25" width="18" height="1.5" rx="0.75" />
+                <rect className="burger-line burger-bot" x="0" y="12.5" width="18" height="1.5" rx="0.75" />
+              </svg>
             </span>
             {settingsOpen && (
               <>
@@ -498,7 +514,15 @@ export default function App() {
                 <div className="settings-popover" onClick={(e) => e.stopPropagation()}>
                   <div className="settings-mobile-selects">
                     <div className="settings-mobile-row">
-                      <span className="settings-mobile-label">Input</span>
+                      <span className="settings-mobile-label">
+                        Input
+                        <span className={`settings-status-dot ${
+                          micEnabled
+                            ? (micStatus === "active" ? "connected" : micStatus === "requesting" ? "pending" : "denied")
+                            : (midiStatus.state === "connected" && midiStatus.deviceCount > 0 ? "connected"
+                              : midiStatus.state === "pending" ? "pending" : "denied")
+                        }`} />
+                      </span>
                       <select
                         className="settings-mobile-select"
                         value={micEnabled ? "mic" : "midi"}
@@ -550,53 +574,32 @@ export default function App() {
                       </select>
                     </div>
                   </div>
-                  <button
-                    className={`settings-item ${suggestMode ? "active" : ""}`}
-                    onClick={() => setSuggestMode((v) => !v)}
-                  >
-                    Suggestions
+                  <button className="settings-item" onClick={() => { setLatchMode((v) => { if (v) clearLatch(); return !v; }); }}>
+                    Key lock <span className={`settings-check ${latchMode ? "checked" : ""}`} />
                   </button>
-                  <button
-                    className={`settings-item ${showRomanNumerals ? "active" : ""}`}
-                    onClick={() => setShowRomanNumerals((v) => !v)}
-                  >
-                    Roman Numerals
+                  <button className="settings-item" onClick={() => setSuggestMode((v) => !v)}>
+                    Suggestions <span className={`settings-check ${suggestMode ? "checked" : ""}`} />
                   </button>
-                  <button
-                    className={`settings-item ${showHotkeys ? "active" : ""}`}
-                    onClick={() => setShowHotkeys((v) => !v)}
-                  >
-                    Hotkeys
+                  <button className="settings-item" onClick={() => setShowHotkeys((v) => !v)}>
+                    Hotkeys <span className={`settings-check ${showHotkeys ? "checked" : ""}`} />
                   </button>
-                  <button
-                    className={`settings-item ${showNoteNames ? "active" : ""}`}
-                    onClick={() => setShowNoteNames((v) => !v)}
-                  >
-                    Note Names
+                  <button className="settings-item" onClick={() => setShowRomanNumerals((v) => !v)}>
+                    Numerals <span className={`settings-check ${showRomanNumerals ? "checked" : ""}`} />
                   </button>
-                  <button
-                    className={`settings-item ${scrollLocked ? "active" : ""}`}
-                    onClick={() => setScrollLocked((v) => !v)}
-                  >
-                    Lock Keyboard
+                  <button className="settings-item" onClick={() => setShowNoteNames((v) => !v)}>
+                    Note names <span className={`settings-check ${showNoteNames ? "checked" : ""}`} />
                   </button>
-                  <button
-                    className={`settings-item ${showRipples ? "active" : ""}`}
-                    onClick={() => setShowRipples((v) => !v)}
-                  >
-                    Ripples
+                  <button className="settings-item" onClick={() => setScrollLocked((v) => !v)}>
+                    Lock keyboard <span className={`settings-check ${scrollLocked ? "checked" : ""}`} />
                   </button>
-                  <button
-                    className={`settings-item ${showParticles ? "active" : ""}`}
-                    onClick={() => setShowParticles((v) => !v)}
-                  >
-                    Particles
+                  <button className="settings-item" onClick={() => setShowRipples((v) => !v)}>
+                    Ripples <span className={`settings-check ${showRipples ? "checked" : ""}`} />
                   </button>
-                  <button
-                    className={`settings-item ${darkMode ? "active" : ""}`}
-                    onClick={() => setDarkMode((v) => !v)}
-                  >
-                    Dark Mode
+                  <button className="settings-item" onClick={() => setShowParticles((v) => !v)}>
+                    Particles <span className={`settings-check ${showParticles ? "checked" : ""}`} />
+                  </button>
+                  <button className="settings-item" onClick={() => setDarkMode((v) => !v)}>
+                    Dark mode <span className={`settings-check ${darkMode ? "checked" : ""}`} />
                   </button>
                 </div>
               </>
@@ -661,13 +664,11 @@ export default function App() {
             const hasScale = scaleSet.size > 0;
             return pills.map((p) => {
               const inScale = hasScale && scaleSet.has(p.sortPc);
-              const pillClass = p.missing ? "missing"
-                : hasScale ? (inScale ? "in-scale" : "out-scale")
-                : "";
+              const variant: PillVariant = p.missing ? "missing"
+                : hasScale ? (inScale ? "inScale" : "outScale")
+                : "default";
               return (
-                <span key={p.key} className={`pill ${pillClass}`}>
-                  {p.label}
-                </span>
+                <NotePill key={p.key} label={p.label} variant={variant} />
               );
             });
           })()}
@@ -681,6 +682,7 @@ export default function App() {
           scalePitchClasses={scalePitchClasses}
           hotkeyLabels={showHotkeys ? MIDI_TO_KEY : undefined}
           noteNameLabels={showNoteNames ? noteNames : undefined}
+          activeNoteNames={isMobile ? noteNames : undefined}
           darkMode={darkMode}
           scrollLocked={scrollLocked}
           onNoteOn={(n) => handleNoteOn(n)}
