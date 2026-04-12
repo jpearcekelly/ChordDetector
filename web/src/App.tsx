@@ -7,6 +7,8 @@ import * as audio from "./lib/audioEngine";
 import { startMic, stopMic, type MicStatus } from "./lib/micEngine";
 import Ripples from "./components/Ripples";
 import Particles from "./components/Particles";
+import HotkeyBadge from "./components/HotkeyBadge";
+import ChromeSelect from "./components/ChromeSelect";
 import "./App.css";
 
 const ALL_KEYS = allKeys();
@@ -370,127 +372,95 @@ export default function App() {
           Tonal
         </div>
 
-        <label className="chrome-cell chrome-input-cell" htmlFor="input-select">
-          <select
-            id="input-select"
-            className="chrome-select chrome-select-bare"
-            value={micEnabled ? "mic" : "midi"}
-            onChange={(e) => {
-              if (e.target.value === "mic") {
-                setMicEnabled(true);
-              } else {
-                setMicEnabled(false);
-              }
-              e.target.blur();
-            }}
-          >
-            <option value="midi">
-              {midiStatus.state === "connected" && midiStatus.deviceCount > 0
-                ? `Midi`
-                : midiStatus.state === "connected" && midiStatus.deviceCount === 0
-                ? "Midi"
-                : midiStatus.state === "pending" ? "Midi"
-                : midiStatus.state === "unsupported" ? "Keyboard"
-                : "Midi"}
-            </option>
-            <option value="mic">Microphone</option>
-          </select>
-          {!micEnabled && midiStatus.state === "connected" && midiStatus.deviceCount > 0 && (
-            <span className="status-dot connected" />
-          )}
-          {!micEnabled && midiStatus.state === "connected" && midiStatus.deviceCount === 0 && (
-            <span className="status-dot waiting" />
-          )}
-          {!micEnabled && midiStatus.state === "pending" && (
-            <span className="status-dot pending" />
-          )}
-          {!micEnabled && midiStatus.state === "denied" && (
-            <span className="status-dot denied" />
-          )}
-          {micEnabled && micStatus === "active" && (
-            <span className="status-dot connected" />
-          )}
-          <svg className="chrome-chevron" width="10" height="6" viewBox="0 0 10 6" fill="currentColor"><path d="M0 0l5 6 5-6z" /></svg>
-        </label>
+        <ChromeSelect
+          className="chrome-hide-mobile"
+          id="input-select"
+          value={micEnabled ? "mic" : "midi"}
+          onChange={(val) => setMicEnabled(val === "mic")}
+          statusDot={
+            micEnabled
+              ? (micStatus === "active" ? "connected" : micStatus === "requesting" ? "pending" : "denied")
+              : (midiStatus.state === "connected" && midiStatus.deviceCount > 0 ? "connected"
+                : midiStatus.state === "pending" ? "pending" : "denied")
+          }
+        >
+          <option value="midi">
+            {midiStatus.state === "unsupported" ? "Keyboard" : "Midi"}
+          </option>
+          <option value="mic">Microphone</option>
+        </ChromeSelect>
 
-        <label className="chrome-cell" htmlFor="key-select">
-          <select
-            id="key-select"
-            className={`chrome-select ${keyMode === "none" ? "chrome-select-inactive" : ""}`}
-            value={keyMode === "none" ? "none" : keyMode === "auto" ? "auto" : `${keyMode.tonic}-${keyMode.mode}`}
-            onChange={(e) => {
-              const val = e.target.value;
-              if (val === "none") {
-                setKeyMode("none");
-              } else if (val === "auto") {
-                setKeyMode("auto");
-                setLockedKey(null);
-                histogramRef.current = new Array(12).fill(0);
-              } else {
-                const [tonic, mode] = val.split("-");
-                setKeyMode({ tonic: Number(tonic), mode: mode as "major" | "minor" });
-              }
-              e.target.blur();
-            }}
-          >
-            <option value="none">No key</option>
-            <option value="auto">
-              Auto{lockedKey ? ` · ${formatKey(lockedKey)}` : detectedKey ? ` · ${formatKey(detectedKey)}…` : ""}
-            </option>
-            <optgroup label="Major">
-              {ALL_KEYS.filter((k) => k.mode === "major").map((k) => (
-                <option key={`${k.tonic}-${k.mode}`} value={`${k.tonic}-${k.mode}`}>
-                  {formatKey(k)}
-                </option>
-              ))}
-            </optgroup>
-            <optgroup label="Minor">
-              {ALL_KEYS.filter((k) => k.mode === "minor").map((k) => (
-                <option key={`${k.tonic}-${k.mode}`} value={`${k.tonic}-${k.mode}`}>
-                  {formatKey(k)}
-                </option>
-              ))}
-            </optgroup>
-          </select>
-        </label>
+        <ChromeSelect
+          className="chrome-hide-mobile"
+          id="key-select"
+          value={keyMode === "none" ? "none" : keyMode === "auto" ? "auto" : `${keyMode.tonic}-${keyMode.mode}`}
+          onChange={(val) => {
+            if (val === "none") {
+              setKeyMode("none");
+            } else if (val === "auto") {
+              setKeyMode("auto");
+              setLockedKey(null);
+              histogramRef.current = new Array(12).fill(0);
+            } else {
+              const [tonic, mode] = val.split("-");
+              setKeyMode({ tonic: Number(tonic), mode: mode as "major" | "minor" });
+            }
+          }}
+          inactive={keyMode === "none"}
+        >
+          <option value="none">No key</option>
+          <option value="auto">
+            Auto{lockedKey ? ` · ${formatKey(lockedKey)}` : detectedKey ? ` · ${formatKey(detectedKey)}…` : ""}
+          </option>
+          <optgroup label="Major">
+            {ALL_KEYS.filter((k) => k.mode === "major").map((k) => (
+              <option key={`${k.tonic}-${k.mode}`} value={`${k.tonic}-${k.mode}`}>
+                {formatKey(k)}
+              </option>
+            ))}
+          </optgroup>
+          <optgroup label="Minor">
+            {ALL_KEYS.filter((k) => k.mode === "minor").map((k) => (
+              <option key={`${k.tonic}-${k.mode}`} value={`${k.tonic}-${k.mode}`}>
+                {formatKey(k)}
+              </option>
+            ))}
+          </optgroup>
+        </ChromeSelect>
 
-        <label className="chrome-cell" htmlFor="scale-select">
-          <select
-            id="scale-select"
-            className={`chrome-select ${!scaleMode ? "chrome-select-inactive" : ""}`}
-            value={scaleMode ? scaleMode.name : "off"}
-            onChange={(e) => {
-              const val = e.target.value;
-              if (val === "off") {
-                setScaleMode(null);
-              } else {
-                setScaleMode(SCALE_MODES.find((m) => m.name === val) ?? null);
-                // Default to C major if no key is set
-                if (keyMode === "none") {
-                  setKeyMode({ tonic: 0, mode: "major" });
-                }
+        <ChromeSelect
+          className="chrome-hide-mobile"
+          id="scale-select"
+          value={scaleMode ? scaleMode.name : "off"}
+          onChange={(val) => {
+            if (val === "off") {
+              setScaleMode(null);
+            } else {
+              setScaleMode(SCALE_MODES.find((m) => m.name === val) ?? null);
+              if (keyMode === "none") {
+                setKeyMode({ tonic: 0, mode: "major" });
               }
-              e.target.blur();
-            }}
-          >
-            <option value="off">No scale</option>
-            <optgroup label="Modes">
-              {SCALE_MODES.filter((m) => m.category === "diatonic").map((m) => (
-                <option key={m.name} value={m.name}>{m.name}</option>
-              ))}
-            </optgroup>
-            <optgroup label="Minor Variants">
-              {SCALE_MODES.filter((m) => m.category === "minor-variant").map((m) => (
-                <option key={m.name} value={m.name}>{m.name}</option>
-              ))}
-            </optgroup>
-            <optgroup label="Pentatonic / Blues">
-              {SCALE_MODES.filter((m) => m.category === "pentatonic").map((m) => (
-                <option key={m.name} value={m.name}>{m.name}</option>
-              ))}
-            </optgroup>
-          </select>
-        </label>
+            }
+          }}
+          inactive={!scaleMode}
+        >
+          <option value="off">No scale</option>
+          <optgroup label="Modes">
+            {SCALE_MODES.filter((m) => m.category === "diatonic").map((m) => (
+              <option key={m.name} value={m.name}>{m.name}</option>
+            ))}
+          </optgroup>
+          <optgroup label="Minor Variants">
+            {SCALE_MODES.filter((m) => m.category === "minor-variant").map((m) => (
+              <option key={m.name} value={m.name}>{m.name}</option>
+            ))}
+          </optgroup>
+          <optgroup label="Pentatonic / Blues">
+            {SCALE_MODES.filter((m) => m.category === "pentatonic").map((m) => (
+              <option key={m.name} value={m.name}>{m.name}</option>
+            ))}
+          </optgroup>
+        </ChromeSelect>
 
         <div
           className={`chrome-cell chrome-toggle ${latchMode ? "active" : ""}`}
@@ -502,12 +472,12 @@ export default function App() {
           }}
           title="Key Lock — notes stay held (⇧L)"
         >
-          Key lock <span className="chrome-shortcut">Shift+L</span>
+          Key lock <HotkeyBadge label="Shift+L" active={latchMode} />
         </div>
 
         {showHotkeys && (
-          <div className={`chrome-cell chrome-toggle ${pedalDown ? "active" : ""}`}>
-            Pedal <span className="chrome-shortcut">Space</span>
+          <div className={`chrome-cell chrome-toggle chrome-hide-mobile ${pedalDown ? "active" : ""}`}>
+            Pedal <HotkeyBadge label="Space" active={pedalDown} />
           </div>
         )}
 
@@ -526,6 +496,60 @@ export default function App() {
               <>
                 <div className="settings-backdrop" onClick={(e) => { e.stopPropagation(); setSettingsOpen(false); }} />
                 <div className="settings-popover" onClick={(e) => e.stopPropagation()}>
+                  <div className="settings-mobile-selects">
+                    <div className="settings-mobile-row">
+                      <span className="settings-mobile-label">Input</span>
+                      <select
+                        className="settings-mobile-select"
+                        value={micEnabled ? "mic" : "midi"}
+                        onChange={(e) => { setMicEnabled(e.target.value === "mic"); e.target.blur(); }}
+                      >
+                        <option value="midi">Midi</option>
+                        <option value="mic">Microphone</option>
+                      </select>
+                    </div>
+                    <div className="settings-mobile-row">
+                      <span className="settings-mobile-label">Key</span>
+                      <select
+                        className="settings-mobile-select"
+                        value={keyMode === "none" ? "none" : keyMode === "auto" ? "auto" : `${keyMode.tonic}-${keyMode.mode}`}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === "none") setKeyMode("none");
+                          else if (val === "auto") { setKeyMode("auto"); setLockedKey(null); histogramRef.current = new Array(12).fill(0); }
+                          else { const [t, m] = val.split("-"); setKeyMode({ tonic: Number(t), mode: m as "major" | "minor" }); }
+                          e.target.blur();
+                        }}
+                      >
+                        <option value="none">None</option>
+                        <option value="auto">Auto{lockedKey ? ` · ${formatKey(lockedKey)}` : ""}</option>
+                        {ALL_KEYS.filter((k) => k.mode === "major").map((k) => (
+                          <option key={`${k.tonic}-${k.mode}`} value={`${k.tonic}-${k.mode}`}>{formatKey(k)}</option>
+                        ))}
+                        {ALL_KEYS.filter((k) => k.mode === "minor").map((k) => (
+                          <option key={`${k.tonic}-${k.mode}`} value={`${k.tonic}-${k.mode}`}>{formatKey(k)}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="settings-mobile-row">
+                      <span className="settings-mobile-label">Scale</span>
+                      <select
+                        className="settings-mobile-select"
+                        value={scaleMode ? scaleMode.name : "off"}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === "off") setScaleMode(null);
+                          else { setScaleMode(SCALE_MODES.find((m) => m.name === val) ?? null); if (keyMode === "none") setKeyMode({ tonic: 0, mode: "major" }); }
+                          e.target.blur();
+                        }}
+                      >
+                        <option value="off">None</option>
+                        {SCALE_MODES.map((m) => (
+                          <option key={m.name} value={m.name}>{m.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
                   <button
                     className={`settings-item ${suggestMode ? "active" : ""}`}
                     onClick={() => setSuggestMode((v) => !v)}

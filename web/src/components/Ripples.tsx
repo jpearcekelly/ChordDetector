@@ -25,7 +25,7 @@ function noteToX(note: number): number {
 
 // Same warmth spectrum as particles
 function computeHue(suffix: string, exact: boolean): [number, number] {
-  if (!exact && suffix !== "") return [0, 80]; // spicy red
+  if (!exact && suffix !== "" && suffix !== "maj") return [0, 80]; // spicy red
   if (suffix.includes("dim") || suffix.includes("°") || suffix.includes("ø")) return [240, 60];
   if (suffix === "m" || suffix === "min") return [210, 65];
   if (suffix.startsWith("m") && !suffix.includes("maj")) return [195, 60];
@@ -34,7 +34,7 @@ function computeHue(suffix: string, exact: boolean): [number, number] {
   if (suffix.includes("aug") || suffix.includes("+")) return [320, 70];
   if (suffix === "7" || suffix === "9" || suffix === "11" || suffix === "13") return [30, 70];
   if (suffix.startsWith("maj")) return [45, 65];
-  if (suffix === "") return [50, 60];
+  if (suffix === "" || suffix === "maj") return [50, 60];
   return [50, 60];
 }
 

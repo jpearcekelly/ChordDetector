@@ -29,7 +29,7 @@ function noteToX(note: number): number {
 // 240 blue      210       160 teal     30 orange  0 red
 function computeHue(suffix: string, exact: boolean): number {
   // No clean chord detected — spicy red (dissonant cluster)
-  if (!exact && suffix !== "") return 0;
+  if (!exact && suffix !== "" && suffix !== "maj") return 0;
 
   // Coldest → warmest by chord quality
   if (suffix.includes("dim") || suffix.includes("°") || suffix.includes("ø")) return 240;
@@ -44,7 +44,7 @@ function computeHue(suffix: string, exact: boolean): number {
   // Major 7 — warm and lush
   if (suffix.startsWith("maj")) return 45;
   // Plain major triad — warm
-  if (suffix === "") return 50;
+  if (suffix === "" || suffix === "maj") return 50;
   // Fallback
   return 50;
 }

@@ -16,7 +16,7 @@ body {
   --text-muted: rgba(0, 0, 0, 0.15);
   --text-subtle: rgba(0, 0, 0, 0.4);
   --text-faint: rgba(0, 0, 0, 0.08);
-  --border: rgba(0, 0, 0, 0.15);
+  --border: rgba(0, 0, 0, 1);
   --accent: #d4a843;
   --accent-bg: rgba(212, 168, 67, 0.12);
   --pill-bg: rgba(212, 168, 67, 0.15);
@@ -42,7 +42,7 @@ body {
   --text-muted: rgba(255, 255, 255, 0.15);
   --text-subtle: rgba(255, 255, 255, 0.4);
   --text-faint: rgba(255, 255, 255, 0.08);
-  --border: rgba(255, 255, 255, 0.12);
+  --border: rgba(255, 255, 255, 0.25);
   --accent: #d4a843;
   --accent-bg: rgba(212, 168, 67, 0.12);
   --pill-bg: rgba(212, 168, 67, 0.15);
@@ -71,6 +71,8 @@ body {
   background: var(--bg);
   color: var(--text);
   transition: background 0.3s ease, color 0.3s ease;
+  outline: 1px solid var(--border);
+  outline-offset: -1px;
 }
 
 /* ── Chord display ─────────────────────────────── */
@@ -86,6 +88,10 @@ body {
 }
 
 @media (max-width: 600px) {
+  .chrome-hide-mobile {
+    display: none !important;
+  }
+
   .chord-display {
     padding: 12px 16px;
     gap: 8px;
@@ -370,13 +376,23 @@ body {
   color: var(--text);
 }
 
-.chrome-shortcut {
+/* ── Hotkey badge (shared component) ─────────── */
+.hotkey-badge {
+  font-family: "Space Mono", monospace;
   font-size: 10px;
+  font-weight: 500;
   padding: 1px 5px;
-  border: 1px solid var(--border);
+  border: 1px solid rgba(0, 0, 0, 0.2);
   border-radius: 3px;
   margin-left: 4px;
-  opacity: 0.5;
+  color: rgba(0, 0, 0, 0.3);
+  display: inline-block;
+  line-height: 1.4;
+}
+
+.hotkey-badge.active {
+  border-color: var(--text);
+  color: var(--text);
 }
 
 .chrome-spacer {
@@ -390,8 +406,14 @@ body {
   border-left: 1px solid var(--border);
 }
 
-/* ── Chrome selects & buttons ───────────────────── */
-.chrome-select {
+/* ── ChromeSelect component ─────────────────────── */
+.chrome-select-cell {
+  cursor: pointer;
+  padding: 0 !important;
+  gap: 6px;
+}
+
+.chrome-select-input {
   appearance: none;
   background: none;
   border: none;
@@ -399,33 +421,27 @@ body {
   font-family: "Space Grotesk", sans-serif;
   font-size: 14px;
   cursor: pointer;
-  padding: 0;
-  padding-right: 16px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23999'/%3E%3C/svg%3E");
+  padding: 12px 32px 12px 16px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23000'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 0 center;
+  background-position: right 12px center;
 }
 
-.chrome-select:focus {
+.chrome-select-input:focus {
   outline: none;
 }
 
-.chrome-select-inactive {
+.chrome-select-input.inactive {
   color: var(--text-subtle);
 }
 
-.chrome-select-bare {
-  background-image: none;
-  padding-right: 0;
+/* When a status dot is present, shrink the select's left padding — the cell provides the left gap */
+.chrome-select-cell:has(.status-dot) {
+  padding-left: 16px !important;
 }
 
-.chrome-chevron {
-  opacity: 0.35;
-  flex-shrink: 0;
-}
-
-.chrome-input-cell {
-  cursor: pointer;
+.chrome-select-cell:has(.status-dot) > .chrome-select-input {
+  padding-left: 0;
 }
 
 
@@ -434,10 +450,17 @@ body {
   height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
+  pointer-events: none;
 }
 
 .status-dot.connected {
   background: #22c55e;
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+  50% { box-shadow: 0 0 0 3px rgba(34, 197, 94, 0); }
 }
 
 .status-dot.waiting {
@@ -467,7 +490,7 @@ body {
 }
 
 .settings-trigger svg {
-  opacity: 0.4;
+  opacity: 1;
 }
 
 /* ── Settings menu ─────────────────────────────── */
@@ -505,7 +528,7 @@ body {
   border: none;
   border-radius: 3px;
   background: none;
-  color: var(--text-subtle);
+  color: var(--text);
   font-size: 12px;
   font-weight: 400;
   font-family: "Space Mono", monospace;
@@ -515,5 +538,54 @@ body {
 }
 
 .settings-item.active {
-  color: var(--active-text);
+  color: var(--text);
+  font-weight: 700;
+}
+
+/* ── Mobile-only selects in settings popover ───── */
+.settings-mobile-selects {
+  display: none;
+}
+
+@media (max-width: 600px) {
+  .settings-mobile-selects {
+    display: flex;
+    flex-direction: column;
+    padding: 4px 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 4px;
+  }
+}
+
+.settings-mobile-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  gap: 12px;
+}
+
+.settings-mobile-label {
+  font-family: "Space Mono", monospace;
+  font-size: 12px;
+  color: var(--text-subtle);
+}
+
+.settings-mobile-select {
+  appearance: none;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text);
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 12px;
+  padding: 4px 24px 4px 8px;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23000'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+}
+
+.settings-mobile-select:focus {
+  outline: none;
 }
