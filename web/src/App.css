@@ -505,12 +505,12 @@ body {
 }
 
 .burger-line {
-  transition: transform 0.25s ease, opacity 0.2s ease;
-  transform-origin: center;
+  transition: transform 0.3s ease, opacity 0.2s ease;
+  transform-origin: 9px 7px;
 }
 
 .settings-trigger.open .burger-top {
-  transform: translateY(6.25px) rotate(45deg);
+  transform: translate(0, 6.25px) rotate(45deg);
 }
 
 .settings-trigger.open .burger-mid {
@@ -518,7 +518,7 @@ body {
 }
 
 .settings-trigger.open .burger-bot {
-  transform: translateY(-6.25px) rotate(-45deg);
+  transform: translate(0, -6.25px) rotate(-45deg);
 }
 
 /* ── Settings menu ─────────────────────────────── */
@@ -534,16 +534,18 @@ body {
 
 .settings-popover {
   position: fixed;
-  top: 0;
+  top: 42px; /* below chrome bar */
   right: 0;
   bottom: 0;
   background: var(--popover-bg);
   border-left: 1px solid var(--border);
+  border-top: 1px solid var(--border);
   border-radius: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  min-width: 260px;
+  min-width: 280px;
+  overflow-y: auto;
   z-index: 100;
   box-shadow: var(--popover-shadow);
 }
@@ -568,9 +570,9 @@ body {
 }
 
 .settings-check {
-  width: 14px;
-  height: 14px;
-  border: 1px solid var(--border);
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid var(--border);
   border-radius: 2px;
   flex-shrink: 0;
   position: relative;
@@ -583,13 +585,18 @@ body {
 .settings-check.checked::after {
   content: "";
   position: absolute;
-  left: 3.5px;
+  left: 4.5px;
   top: 1px;
-  width: 4px;
-  height: 8px;
+  width: 5px;
+  height: 10px;
   border: solid var(--bg);
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
+}
+
+/* First settings item gets top border too */
+.settings-mobile-selects + .settings-item {
+  border-top: 1px solid var(--border);
 }
 
 /* ── Settings selects (shown in popover, hidden on desktop chrome bar) ── */
@@ -631,22 +638,17 @@ body {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23000'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 0 center;
+  text-align: right;
 }
 
 .settings-mobile-select:focus {
   outline: none;
 }
 
-/* Status dot in settings input row */
-.settings-status-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  flex-shrink: 0;
+/* Status dot in settings input row — uses same dot as chrome bar */
+.settings-mobile-label .status-dot {
   display: inline-block;
+  vertical-align: middle;
   margin-left: 6px;
+  pointer-events: auto;
 }
-
-.settings-status-dot.connected { background: #22c55e; }
-.settings-status-dot.denied { background: #ef4444; }
-.settings-status-dot.pending { background: #6b7280; }

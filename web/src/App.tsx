@@ -475,7 +475,7 @@ export default function App() {
         </ChromeSelect>
 
         <div
-          className={`chrome-cell chrome-toggle ${latchMode ? "active" : ""}`}
+          className={`chrome-cell chrome-toggle chrome-hide-mobile ${latchMode ? "active" : ""}`}
           onClick={() => {
             setLatchMode((v) => {
               if (v) clearLatch();
@@ -516,7 +516,7 @@ export default function App() {
                     <div className="settings-mobile-row">
                       <span className="settings-mobile-label">
                         Input
-                        <span className={`settings-status-dot ${
+                        <span className={`status-dot ${
                           micEnabled
                             ? (micStatus === "active" ? "connected" : micStatus === "requesting" ? "pending" : "denied")
                             : (midiStatus.state === "connected" && midiStatus.deviceCount > 0 ? "connected"
