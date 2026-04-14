@@ -9,8 +9,8 @@ export const BADGE = {
   fontWeight: 500,
   borderRadius: 3,
   light: {
-    border: "rgba(0, 0, 0, 0.2)",
-    text: "rgba(0, 0, 0, 0.3)",
+    border: "rgba(0, 0, 0, 0.3)",
+    text: "rgba(0, 0, 0, 0.4)",
     borderActive: "rgba(0, 0, 0, 1)",
     textActive: "rgba(0, 0, 0, 1)",
   },
@@ -22,8 +22,8 @@ export const BADGE = {
   },
   // For keys on a dark surface (black piano keys)
   onDark: {
-    border: "rgba(255, 255, 255, 0.2)",
-    text: "rgba(255, 255, 255, 0.35)",
+    border: "rgba(255, 255, 255, 0.3)",
+    text: "rgba(255, 255, 255, 0.45)",
     borderActive: "rgba(255, 255, 255, 0.7)",
     textActive: "rgba(255, 255, 255, 0.9)",
   },

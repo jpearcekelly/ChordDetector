@@ -58,20 +58,17 @@ export default function Ripples({ noteOnEvent, chordSuffix, chordExact, darkMode
 
     const xCenter = noteToX(noteOnEvent.note);
 
-    // Each note spawns 1-3 ripples depending on velocity
-    const count = vel > 0.7 ? 3 : vel > 0.4 ? 2 : 1;
-    for (let i = 0; i < count; i++) {
-      ripplesRef.current.push({
-        x: rect.width * (xCenter + (Math.random() - 0.5) * 0.08),
-        y: rect.height * (0.4 + (Math.random() - 0.5) * 0.2),
-        radius: 3 + i * 8, // stagger starting radii
-        speed: 0.6 + vel * 1.0 + i * 0.3,
-        lineWidth: 1 + vel2 * 2.5,
-        opacity: (0.15 + vel2 * 0.45) * (darkMode ? 1 : 0.8),
-        hue,
-        sat,
-      });
-    }
+    // One ripple per note
+    ripplesRef.current.push({
+      x: rect.width * xCenter,
+      y: rect.height * 0.4,
+      radius: 3,
+      speed: 0.6 + vel * 1.0,
+      lineWidth: 1 + vel2 * 2.5,
+      opacity: (0.15 + vel2 * 0.45) * (darkMode ? 1 : 0.8),
+      hue,
+      sat,
+    });
   }, [noteOnEvent, chordSuffix, chordExact, darkMode]);
 
   const animate = useCallback(() => {

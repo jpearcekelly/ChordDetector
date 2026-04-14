@@ -545,6 +545,14 @@ body {
   right: 0;
   bottom: 0;
   z-index: 99;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.settings-backdrop.open {
+  pointer-events: auto;
+  opacity: 1;
 }
 
 .settings-popover {
@@ -558,12 +566,18 @@ body {
   border-radius: 0;
   -webkit-user-select: none;
   user-select: none;
+  transform: translateX(100%);
+  transition: transform 0.25s ease;
   padding: 0;
   display: flex;
   flex-direction: column;
   min-width: 280px;
   overflow-y: auto;
   z-index: 100;
+}
+
+.settings-popover.open {
+  transform: translateX(0);
 }
 
 .settings-item {

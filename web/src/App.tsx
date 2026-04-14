@@ -47,7 +47,7 @@ export default function App() {
   const [showHotkeys, setShowHotkeys] = useState(!isMobile);
   const [showNoteNames, setShowNoteNames] = useState(false);
   const [pedalDown, setPedalDown] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem("darkMode") === "true");
   const [scrollLocked, setScrollLocked] = useState(false);
   const [scaleMode, setScaleMode] = useState<ScaleMode | null>(null);
   const [showRipples, setShowRipples] = useState(false);
@@ -510,10 +510,8 @@ export default function App() {
                 <line className={`menu-line menu-bot ${settingsOpen ? "open" : ""}`} x1="2" y1="13" x2="16" y2="13" />
               </svg>
             </span>
-            {settingsOpen && (
-              <>
-                <div className="settings-backdrop" onClick={(e) => { e.stopPropagation(); setSettingsOpen(false); }} />
-                <div className="settings-popover" onClick={(e) => e.stopPropagation()}>
+            <div className={`settings-backdrop ${settingsOpen ? "open" : ""}`} onClick={(e) => { e.stopPropagation(); setSettingsOpen(false); }} />
+            <div className={`settings-popover ${settingsOpen ? "open" : ""}`} onClick={(e) => e.stopPropagation()}>
                   <div className="settings-mobile-selects">
                     <div className="settings-mobile-row">
                       <span className="settings-mobile-label">
@@ -597,12 +595,10 @@ export default function App() {
                   <button className="settings-item" onClick={() => setShowParticles((v) => !v)}>
                     Particles <span className={`settings-check ${showParticles ? "checked" : ""}`} />
                   </button>
-                  <button className="settings-item" onClick={() => setDarkMode((v) => !v)}>
+                  <button className="settings-item" onClick={() => setDarkMode((v) => { const next = !v; localStorage.setItem("darkMode", String(next)); return next; })}>
                     Dark mode <span className={`settings-check ${darkMode ? "checked" : ""}`} />
                   </button>
                 </div>
-              </>
-            )}
           </div>
         </div>
       </div>
@@ -682,7 +678,6 @@ export default function App() {
           hotkeyLabels={showHotkeys ? MIDI_TO_KEY : undefined}
           noteNameLabels={showNoteNames ? noteNames : undefined}
           activeNoteNames={isMobile ? noteNames : undefined}
-          darkMode={darkMode}
           scrollLocked={scrollLocked}
           onNoteOn={(n) => handleNoteOn(n)}
           onNoteOff={handleNoteOff}

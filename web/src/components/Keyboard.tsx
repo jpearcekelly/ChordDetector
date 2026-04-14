@@ -10,7 +10,6 @@ interface KeyboardProps {
   hotkeyLabels?: Record<number, string>; // MIDI note → key label to show on keys
   noteNameLabels?: string[]; // 12-element array of note names indexed by pitch class (all keys)
   activeNoteNames?: string[]; // 12-element array — always shown on active keys regardless of noteNameLabels
-  darkMode?: boolean;
   scrollLocked?: boolean;
   onNoteOn?: (note: number) => void;
   onNoteOff?: (note: number) => void;
@@ -73,7 +72,7 @@ const TOUCH_MIN_KEY_WIDTH = 52;
 const C4_WHITE_IDX = MIDI_TO_WHITE_IDX.get(60) ?? 23;
 
 
-export default function Keyboard({ activeNotes, suggestedPitchClasses = [], scalePitchClasses = [], hotkeyLabels, noteNameLabels, activeNoteNames, darkMode = true, scrollLocked = false, onNoteOn, onNoteOff }: KeyboardProps) {
+export default function Keyboard({ activeNotes, suggestedPitchClasses = [], scalePitchClasses = [], hotkeyLabels, noteNameLabels, activeNoteNames, scrollLocked = false, onNoteOn, onNoteOff }: KeyboardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const pressedRef = useRef<number | null>(null);
@@ -130,7 +129,6 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], scal
 
     // Create cross-hatch pattern for out-of-scale keys
     let hatchPattern: CanvasPattern | null = null;
-    let hatchPatternDark: CanvasPattern | null = null;
     if (scaleSet.size > 0) {
       const size = 8 * dpr;
       const lw = 0.5;
@@ -155,7 +153,6 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], scal
         return ctx.createPattern(c, "repeat");
       };
       hatchPattern = makeHatch("#ffffff", "#000000");
-      hatchPatternDark = makeHatch("#1a1a1a", "rgba(255,255,255,0.2)");
     }
 
     // Offset to translate global white-key indices to local ones
@@ -176,12 +173,11 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], scal
           ? (inScale ? "#22c55e" : "#ef4444")
           : "#eab308";
       } else if (isSuggested) {
-        ctx.fillStyle = darkMode ? "#2e2a1f" : "#faf5eb";
+        ctx.fillStyle = "#faf5eb";
       } else if (isOutOfScale) {
-        const pat = darkMode ? hatchPatternDark : hatchPattern;
-        ctx.fillStyle = pat || (darkMode ? "#2a2a2a" : "#d0d0d0");
+        ctx.fillStyle = hatchPattern || "#d0d0d0";
       } else {
-        ctx.fillStyle = darkMode ? "#ffffff" : "#ffffff";
+        ctx.fillStyle = "#ffffff";
       }
       const x2 = Math.round((i + 1) * wkw);
       ctx.fillRect(Math.round(x), 0, x2 - Math.round(x), h);
@@ -216,16 +212,14 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], scal
       // Note name with octave at the bottom — replaces C labels when noteNameLabels is on
       if (noteNameLabels && !isOutOfScale) {
         const label = `${noteNameLabels[midi % 12]}${octave}`;
-        ctx.fillStyle = isActive
-          ? (darkMode ? "rgba(0,0,0,0.5)" : "rgba(0,0,0,0.5)")
-          : (darkMode ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.18)");
+        ctx.fillStyle = isActive ? "rgba(0,0,0,0.5)" : "rgba(0,0,0,0.18)";
         ctx.font = `500 ${Math.min(9, wkw * 0.35)}px "Space Mono", monospace`;
         ctx.textAlign = "center";
         ctx.fillText(label, x + wkw / 2, h - 6);
       } else if (!noteNameLabels && midi % 12 === 0 && !isOutOfScale) {
         // C labels only when note names are off
         const label = `C${octave}`;
-        ctx.fillStyle = darkMode ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.2)";
+        ctx.fillStyle = "rgba(0,0,0,0.2)";
         ctx.font = `500 ${Math.min(9, wkw * 0.35)}px "Space Mono", monospace`;
         ctx.textAlign = "center";
         ctx.fillText(label, x + wkw / 2, h - 6);
@@ -235,7 +229,7 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], scal
       if (hotkeyLabels && hotkeyLabels[midi] && !isOutOfScale) {
         const bx = x + wkw / 2;
         const by = bkh + (h - bkh) * 0.45;
-        drawHotkeyBadge(ctx, hotkeyLabels[midi], bx, by, Math.min(wkw * 0.65, 22), Math.min(wkw * 0.45, 16), darkMode ? "dark" : "light", isActive);
+        drawHotkeyBadge(ctx, hotkeyLabels[midi], bx, by, Math.min(wkw * 0.65, 22), Math.min(wkw * 0.45, 16), "light", isActive);
       }
 
       // Mobile-only: draw note pill on active keys when activeNoteNames is set
@@ -269,14 +263,13 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], scal
           : "#eab308";
         ctx.fillRect(x, 0, bkw, bkh);
       } else if (isSuggested) {
-        ctx.fillStyle = darkMode ? "#4a4230" : "#8a7a50";
+        ctx.fillStyle = "#8a7a50";
         ctx.fillRect(x, 0, bkw, bkh);
       } else if (isOutOfScale) {
-        const pat = darkMode ? hatchPatternDark : hatchPattern;
-        ctx.fillStyle = pat || (darkMode ? "#2a2a2a" : "#d0d0d0");
+        ctx.fillStyle = hatchPattern || "#d0d0d0";
         ctx.fillRect(x, 0, bkw, bkh);
       } else {
-        ctx.fillStyle = darkMode ? "#1a1a1a" : "#111111";
+        ctx.fillStyle = "#111111";
         ctx.fillRect(x, 0, bkw, bkh);
       }
 
@@ -294,7 +287,7 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], scal
       if (hotkeyLabels && hotkeyLabels[midi] && !isOutOfScale) {
         const bx = x + bkw / 2;
         const by = bkh * 0.55;
-        const variant = isActive ? (darkMode ? "dark" : "light") : "onDark";
+        const variant = isActive ? "light" : "onDark";
         drawHotkeyBadge(ctx, hotkeyLabels[midi], bx, by, Math.min(bkw * 0.75, 20), Math.min(bkw * 0.5, 14), variant, isActive);
       }
 
@@ -323,7 +316,7 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], scal
 
     // Save for hit-testing
     visibleStateRef.current = { white: visibleWhite, black: visibleBlack };
-  }, [activeNotes, suggestedPitchClasses, scalePitchClasses, hotkeyLabels, noteNameLabels, activeNoteNames, darkMode]);
+  }, [activeNotes, suggestedPitchClasses, scalePitchClasses, hotkeyLabels, noteNameLabels, activeNoteNames]);
 
   // Scroll to center on middle C (C4) on first render
   useEffect(() => {
