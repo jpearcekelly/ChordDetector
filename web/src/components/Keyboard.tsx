@@ -277,10 +277,11 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], scal
       ctx.strokeStyle = "rgba(0,0,0,1)";
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(x + 0.5, 0);
+      ctx.moveTo(x + 0.5, 0.5);
       ctx.lineTo(x + 0.5, bkh - 0.5);
       ctx.lineTo(x + bkw - 0.5, bkh - 0.5);
-      ctx.lineTo(x + bkw - 0.5, 0);
+      ctx.lineTo(x + bkw - 0.5, 0.5);
+      ctx.closePath();
       ctx.stroke();
 
       // Hotkey badge — use light variant when active (bright color bg), onDark when inactive (black bg)

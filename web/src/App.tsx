@@ -4,6 +4,7 @@ import { detectChord, noteName } from "./lib/chordDetector";
 import { initMIDI, type MIDIStatus } from "./lib/midiEngine";
 import { detectKey, noteNamesForKey, formatKey, allKeys, romanNumeral, scaleNotes, SCALE_MODES, type Key, type ScaleMode } from "./lib/keyDetector";
 import * as audio from "./lib/audioEngine";
+import type { SoundType } from "./lib/audioEngine";
 import { startMic, stopMic, type MicStatus } from "./lib/micEngine";
 import Ripples from "./components/Ripples";
 import Particles from "./components/Particles";
@@ -52,6 +53,7 @@ export default function App() {
   const [scaleMode, setScaleMode] = useState<ScaleMode | null>(null);
   const [showRipples, setShowRipples] = useState(false);
   const [showParticles, setShowParticles] = useState(false);
+  const [sound, setSound] = useState<SoundType>(() => (localStorage.getItem("sound") as SoundType) || "piano");
   // Incremented on each note-on to trigger particle bursts even for re-struck notes
   const [noteOnEvent, setNoteOnEvent] = useState<{ note: number; velocity: number; id: number }>({ note: 0, velocity: 0, id: 0 });
   const [micEnabled, setMicEnabled] = useState(false);
@@ -62,6 +64,9 @@ export default function App() {
   useEffect(() => {
     audio.getAudioEngine(); // start loading samples
     audio.onSamplerLoaded(() => setSamplesLoaded(true));
+    // Restore saved sound preference
+    const saved = localStorage.getItem("sound") as SoundType | null;
+    if (saved && saved !== "piano") audio.setSound(saved);
   }, []);
 
   // Track sustain pedal state and which notes are being sustained
@@ -204,6 +209,16 @@ export default function App() {
     setActiveNotes(new Set());
   }, []);
 
+  const replayChord = useCallback(() => {
+    if (activeNotes.size === 0) return;
+    audio.ensureAudioContext();
+    for (const note of activeNotes) {
+      audio.noteOff(note);
+      audio.noteOn(note, 80);
+    }
+    setNoteOnEvent({ note: [...activeNotes][0], velocity: 80, id: Date.now() });
+  }, [activeNotes]);
+
   // Clear latched notes
   const clearLatch = useCallback(() => {
     audio.allNotesOff();
@@ -275,6 +290,13 @@ export default function App() {
         return;
       }
 
+      // Enter = replay held chord
+      if (e.key === "Enter") {
+        e.preventDefault();
+        replayChord();
+        return;
+      }
+
       // Spacebar = sustain pedal
       if (e.key === " ") {
         e.preventDefault();
@@ -313,7 +335,7 @@ export default function App() {
       window.removeEventListener("keydown", handleDown);
       window.removeEventListener("keyup", handleUp);
     };
-  }, [clearLatch, handleNoteOn, handleNoteOff, handleSustainOn, handleSustainOff]);
+  }, [clearLatch, handleNoteOn, handleNoteOff, handleSustainOn, handleSustainOff, replayChord]);
 
   useEffect(() => {
     initMIDI(
@@ -574,6 +596,24 @@ export default function App() {
                       </select>
                     </div>
                   </div>
+                  <div className="settings-mobile-row">
+                    <span className="settings-mobile-label">Sound</span>
+                    <select
+                      className="settings-mobile-select"
+                      value={sound}
+                      onChange={(e) => {
+                        const val = e.target.value as SoundType;
+                        setSound(val);
+                        audio.setSound(val);
+                        localStorage.setItem("sound", val);
+                        e.target.blur();
+                      }}
+                    >
+                      <option value="piano">Piano</option>
+                      <option value="rhodes">Rhodes</option>
+                      <option value="sawtooth">Sawtooth</option>
+                    </select>
+                  </div>
                   <button className="settings-item" onClick={() => setSuggestMode((v) => !v)}>
                     Suggestions <span className={`settings-check ${suggestMode ? "checked" : ""}`} />
                   </button>
@@ -611,7 +651,7 @@ export default function App() {
           <Particles activeNotes={activeNotes} noteOnEvent={noteOnEvent} chordSuffix={chord.suffix} chordExact={chord.exact} darkMode={darkMode} />
         )}
         {hasNotes ? (
-          <div className="chord-name-row">
+          <div className="chord-name-row" onClick={() => { const sel = window.getSelection(); if (!sel || sel.isCollapsed) replayChord(); }}>
             <h1 className={`chord-name ${chord.exact ? "active" : "uncertain"}`}>
               {chord.name}
             </h1>
