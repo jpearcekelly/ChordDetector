@@ -379,7 +379,9 @@ export default function App() {
 
   return (
     <div className={`app ${darkMode ? "dark" : "light"}`}>
-      <div className="chrome-bar">
+      <div className="chrome-bar" ref={(el) => {
+        if (el) document.documentElement.style.setProperty("--chrome-bar-height", el.offsetHeight + "px");
+      }}>
         <div className="chrome-cell chrome-brand">
           Tonal
         </div>
@@ -475,7 +477,7 @@ export default function App() {
         </ChromeSelect>
 
         <div
-          className={`chrome-cell chrome-toggle chrome-hide-mobile ${latchMode ? "active" : ""}`}
+          className={`chrome-cell chrome-toggle ${latchMode ? "active" : ""}`}
           onClick={() => {
             setLatchMode((v) => {
               if (v) clearLatch();
@@ -501,11 +503,11 @@ export default function App() {
           style={{ cursor: "pointer" }}
         >
           <div className="settings-menu">
-            <span className={`settings-trigger ${settingsOpen ? "open" : ""}`}>
-              <svg width="18" height="14" viewBox="0 0 18 14" fill="currentColor">
-                <rect className="burger-line burger-top" x="0" y="0" width="18" height="1.5" rx="0.75" />
-                <rect className="burger-line burger-mid" x="0" y="6.25" width="18" height="1.5" rx="0.75" />
-                <rect className="burger-line burger-bot" x="0" y="12.5" width="18" height="1.5" rx="0.75" />
+            <span className="settings-trigger" style={{ width: 18, height: 18, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                <line className={`menu-line menu-top ${settingsOpen ? "open" : ""}`} x1="2" y1="5" x2="16" y2="5" />
+                <line className={`menu-line menu-mid ${settingsOpen ? "open" : ""}`} x1="2" y1="9" x2="16" y2="9" />
+                <line className={`menu-line menu-bot ${settingsOpen ? "open" : ""}`} x1="2" y1="13" x2="16" y2="13" />
               </svg>
             </span>
             {settingsOpen && (
@@ -535,7 +537,7 @@ export default function App() {
                     <div className="settings-mobile-row">
                       <span className="settings-mobile-label">Key</span>
                       <select
-                        className="settings-mobile-select"
+                        className={`settings-mobile-select ${keyMode === "none" ? "inactive" : ""}`}
                         value={keyMode === "none" ? "none" : keyMode === "auto" ? "auto" : `${keyMode.tonic}-${keyMode.mode}`}
                         onChange={(e) => {
                           const val = e.target.value;
@@ -558,7 +560,7 @@ export default function App() {
                     <div className="settings-mobile-row">
                       <span className="settings-mobile-label">Scale</span>
                       <select
-                        className="settings-mobile-select"
+                        className={`settings-mobile-select ${!scaleMode ? "inactive" : ""}`}
                         value={scaleMode ? scaleMode.name : "off"}
                         onChange={(e) => {
                           const val = e.target.value;
@@ -574,9 +576,6 @@ export default function App() {
                       </select>
                     </div>
                   </div>
-                  <button className="settings-item" onClick={() => { setLatchMode((v) => { if (v) clearLatch(); return !v; }); }}>
-                    Key lock <span className={`settings-check ${latchMode ? "checked" : ""}`} />
-                  </button>
                   <button className="settings-item" onClick={() => setSuggestMode((v) => !v)}>
                     Suggestions <span className={`settings-check ${suggestMode ? "checked" : ""}`} />
                   </button>

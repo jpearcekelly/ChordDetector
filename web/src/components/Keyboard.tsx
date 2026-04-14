@@ -188,7 +188,7 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], scal
     }
 
     // ── Pass 2: Hairline separators + top border ──
-    ctx.strokeStyle = darkMode ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,1)";
+    ctx.strokeStyle = "rgba(0,0,0,1)";
     ctx.lineWidth = 1;
     // Top border line
     ctx.beginPath();
@@ -280,10 +280,15 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], scal
         ctx.fillRect(x, 0, bkw, bkh);
       }
 
-      // Black key outline
-      ctx.strokeStyle = darkMode ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,1)";
+      // Black key outline — left, bottom, right (no top, so it overlaps the top border cleanly)
+      ctx.strokeStyle = "rgba(0,0,0,1)";
       ctx.lineWidth = 1;
-      ctx.strokeRect(x + 0.5, 0.5, bkw - 1, bkh - 0.5);
+      ctx.beginPath();
+      ctx.moveTo(x + 0.5, 0);
+      ctx.lineTo(x + 0.5, bkh - 0.5);
+      ctx.lineTo(x + bkw - 0.5, bkh - 0.5);
+      ctx.lineTo(x + bkw - 0.5, 0);
+      ctx.stroke();
 
       // Hotkey badge — use light variant when active (bright color bg), onDark when inactive (black bg)
       if (hotkeyLabels && hotkeyLabels[midi] && !isOutOfScale) {
