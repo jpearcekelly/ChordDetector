@@ -26,7 +26,7 @@ Deploy: `npx vercel --prod`
 
 ### Features
 - [ ] Scale auto-demo — plays selected scale up and down 4 octaves, showcasing keyboard visuals
-- [ ] Alternative sounds — sawtooth synth, Rhodes electric piano (sound selector)
+- [x] Alternative sounds — sawtooth synth, Rhodes electric piano (sound selector)
 - [ ] Camera input — play virtual keyboard via webcam hand tracking
 
 ### Product / Growth
