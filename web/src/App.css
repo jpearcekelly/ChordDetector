@@ -397,10 +397,10 @@ body {
   font-size: 10px;
   font-weight: 500;
   padding: 1px 5px;
-  border: 1px solid rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--text-subtle);
   border-radius: 3px;
   margin-left: 4px;
-  color: rgba(0, 0, 0, 0.3);
+  color: var(--text-subtle);
   display: inline-block;
   line-height: 1.4;
 }
