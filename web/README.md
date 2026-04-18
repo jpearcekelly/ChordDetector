@@ -6,7 +6,7 @@ Real-time chord detection and music theory tool for musicians. Play chords via M
 
 ## Stack
 
-React + TypeScript + Vite, Web MIDI API, Web Audio API (mic), Tone.js (Salamander piano samples)
+React + TypeScript + Vite, Web MIDI API, Web Audio API (mic), Tone.js (Salamander piano samples), MediaPipe Hands (camera tracking)
 
 ## Development
 
@@ -21,13 +21,13 @@ Deploy: `npx vercel --prod`
 ## Roadmap
 
 ### UX / Onboarding
-- [ ] Splash/holding screen on load — input selection + forces first click for AudioContext
-- [ ] Key lock onboarding — tooltip or splash screen explanation (biggest UX friction point for new users)
+- [x] Splash/holding screen on load — input selection + forces first click for AudioContext
+- [x] Note lock onboarding — coachmark tooltips for enable/disable, auto-enable for mouse users, renamed from "Key lock"
 
 ### Features
-- [ ] Scale auto-demo — plays selected scale up and down 4 octaves, showcasing keyboard visuals
+- [x] Scale auto-demo — plays selected scale up and down 4 octaves, showcasing keyboard visuals
 - [x] Alternative sounds — sawtooth synth, Rhodes electric piano (sound selector)
-- [ ] Camera input — play virtual keyboard via webcam hand tracking
+- [x] Camera input — webcam hand tracking with MediaPipe, finger extension detection, sustain-on-enter logic
 
 ### Product / Growth
 - [ ] Custom domain + proper hosting
@@ -38,6 +38,8 @@ Deploy: `npx vercel --prod`
 
 ### Done
 - [x] Dark mode persistence (localStorage)
+- [x] Dark mode radial ink transition (View Transitions API)
+- [x] Splash screen — input cards, dark mode switch, pinned layout
 - [x] Settings panel slide-in/out animation
 - [x] Keyboard always renders in light mode (dark mode only affects app chrome)
 - [x] Hotkey badge visibility fix in dark mode

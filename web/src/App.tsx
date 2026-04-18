@@ -6,12 +6,19 @@ import { detectKey, noteNamesForKey, formatKey, allKeys, romanNumeral, scaleNote
 import * as audio from "./lib/audioEngine";
 import type { SoundType } from "./lib/audioEngine";
 import { startMic, stopMic, type MicStatus } from "./lib/micEngine";
+import { startCamera, stopCamera, pauseCamera, resumeCamera, type CameraStatus } from "./lib/cameraEngine";
+import type { NormalizedLandmark } from "@mediapipe/tasks-vision";
+import CameraOverlay from "./components/CameraOverlay";
 import Ripples from "./components/Ripples";
 import Particles from "./components/Particles";
+import SplashScreen from "./components/SplashScreen";
+import type { InputChoice } from "./components/SplashScreen";
+import RotatePrompt from "./components/RotatePrompt";
 import HotkeyBadge from "./components/HotkeyBadge";
 import ChromeSelect from "./components/ChromeSelect";
 import NotePill from "./components/NotePill";
 import type { PillVariant } from "./components/NotePill";
+import Coachmark from "./components/Coachmark";
 import "./App.css";
 
 const ALL_KEYS = allKeys();
@@ -51,6 +58,9 @@ export default function App() {
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem("darkMode") === "true");
   const [scrollLocked, setScrollLocked] = useState(false);
   const [scaleMode, setScaleMode] = useState<ScaleMode | null>(null);
+  const [scaleDemoPlaying, setScaleDemoPlaying] = useState(false);
+  const scaleDemoRef = useRef<number[]>([]);
+  const scaleDemoPrevNote = useRef(-1);
   const [showRipples, setShowRipples] = useState(false);
   const [showParticles, setShowParticles] = useState(false);
   const [sound, setSound] = useState<SoundType>(() => (localStorage.getItem("sound") as SoundType) || "piano");
@@ -59,7 +69,65 @@ export default function App() {
   const [micEnabled, setMicEnabled] = useState(false);
   const [micStatus, setMicStatus] = useState<MicStatus>("off");
   const micNotesRef = useRef<Set<number>>(new Set());
+  const [cameraEnabled, setCameraEnabled] = useState(false);
+  const [cameraStatus, setCameraStatus] = useState<CameraStatus>("off");
+  const [cameraVideo, setCameraVideo] = useState<HTMLVideoElement | null>(null);
+  const [cameraLandmarks, setCameraLandmarks] = useState<NormalizedLandmark[][] | null>(null);
+  const cameraNotesRef = useRef<Set<number>>(new Set());
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [splashVisible, setSplashVisible] = useState(true);
+  const [splashFading, setSplashFading] = useState(false);
+  const [midiRequested, setMidiRequested] = useState(false);
+  const splashVisibleRef = useRef(true);
+  const [splashChoice, setSplashChoice] = useState<InputChoice | null>(null);
+  const [noteLockTooltip, setNoteLockTooltip] = useState("");
+  const noteLockEnableShown = useRef(false);
+  const noteLockDisableShown = useRef(false);
+  const noteLockRef = useRef<HTMLDivElement>(null);
+
+  const handleSplashSelect = useCallback((choice: InputChoice) => {
+    audio.ensureAudioContext();
+    if (choice === "mic") setMicEnabled(true);
+    if (choice === "midi") setMidiRequested(true);
+    if (choice === "keyboard") setLatchMode(true);
+    if (choice === "camera") setCameraEnabled(true);
+    setSplashChoice(choice);
+    setSplashFading(true);
+    splashVisibleRef.current = false;
+    setTimeout(() => setSplashVisible(false), 400);
+  }, []);
+
+  const triggerThemeToggle = useCallback((e: React.MouseEvent) => {
+    const flipTheme = () => setDarkMode((d) => { const next = !d; localStorage.setItem("darkMode", String(next)); return next; });
+    const doc = document.documentElement;
+    if (!(document as any).startViewTransition) {
+      flipTheme();
+      return;
+    }
+    doc.style.setProperty("--ink-x", `${e.clientX}px`);
+    doc.style.setProperty("--ink-y", `${e.clientY}px`);
+    (document as any).startViewTransition(flipTheme);
+  }, []);
+
+  useEffect(() => {
+    if (!splashVisible) return;
+    const dismiss = (e: KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        handleSplashSelect("keyboard");
+      }
+    };
+    window.addEventListener("keydown", dismiss);
+    return () => window.removeEventListener("keydown", dismiss);
+  }, [splashVisible, handleSplashSelect]);
+
+  useEffect(() => {
+    if (!navigator.permissions || !("requestMIDIAccess" in navigator)) return;
+    const desc = { name: "midi" } as PermissionDescriptor;
+    navigator.permissions.query(desc).then((result) => {
+      if (result.state === "granted") setMidiRequested(true);
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     audio.getAudioEngine(); // start loading samples
@@ -137,10 +205,9 @@ export default function App() {
     }, 3000);
   }, [runDetection]);
 
-  const handleNoteOn = useCallback((note: number, velocity: number = 100) => {
-    const playAudio = !micActiveRef.current; // suppress audio when mic is active
+  const handleNoteOn = useCallback((note: number, velocity: number = 100, fromMic: boolean = false) => {
+    const playAudio = !fromMic;
     if (playAudio) audio.ensureAudioContext();
-    // In latch mode, playing a note that's already held toggles it off
     if (latchRef.current) {
       setActiveNotes((prev) => {
         if (prev.has(note)) {
@@ -153,7 +220,6 @@ export default function App() {
         return new Set(prev).add(note);
       });
     } else {
-      // Re-trigger audio even if note is already sustained by pedal
       if (playAudio) {
         audio.noteOff(note);
         audio.noteOn(note, velocity);
@@ -166,11 +232,10 @@ export default function App() {
     setNoteOnEvent({ note, velocity, id: Date.now() });
   }, [updateHistogram]);
 
-  const handleNoteOff = useCallback((note: number) => {
+  const handleNoteOff = useCallback((note: number, fromMic: boolean = false) => {
     heldNotesRef.current.delete(note);
-    const playAudio = !micActiveRef.current;
+    const playAudio = !fromMic;
 
-    // In latch mode, don't release notes
     if (latchRef.current) return;
 
     if (sustainRef.current) {
@@ -226,6 +291,54 @@ export default function App() {
     setActiveNotes(new Set(heldNotesRef.current));
   }, []);
 
+  const stopScaleDemo = useCallback(() => {
+    for (const id of scaleDemoRef.current) clearTimeout(id);
+    scaleDemoRef.current = [];
+    audio.allNotesOff();
+    setActiveNotes(new Set(heldNotesRef.current));
+    setScaleDemoPlaying(false);
+  }, []);
+
+  const startScaleDemo = useCallback(() => {
+    if (!scaleMode || !activeKey) return;
+    audio.ensureAudioContext();
+    stopScaleDemo();
+
+    const pitchClasses = scaleNotes(activeKey.tonic, scaleMode);
+    const midiNotes: number[] = [];
+    for (let midi = 36; midi <= 84; midi++) {
+      if (pitchClasses.includes(midi % 12)) midiNotes.push(midi);
+    }
+    const sequence = [...midiNotes, ...midiNotes.slice(0, -1).reverse()];
+
+    setScaleDemoPlaying(true);
+    scaleDemoPrevNote.current = -1;
+    const tempo = 120;
+
+    for (let i = 0; i < sequence.length; i++) {
+      const id = window.setTimeout(() => {
+        if (scaleDemoPrevNote.current >= 0) {
+          audio.noteOff(scaleDemoPrevNote.current);
+        }
+        const note = sequence[i];
+        audio.noteOn(note, 80);
+        setActiveNotes(new Set([note]));
+        scaleDemoPrevNote.current = note;
+
+        if (i === sequence.length - 1) {
+          const endId = window.setTimeout(() => {
+            audio.noteOff(note);
+            setActiveNotes(new Set(heldNotesRef.current));
+            setScaleDemoPlaying(false);
+            scaleDemoRef.current = [];
+          }, tempo);
+          scaleDemoRef.current.push(endId);
+        }
+      }, i * tempo);
+      scaleDemoRef.current.push(id);
+    }
+  }, [scaleMode, activeKey, stopScaleDemo]);
+
   // QWERTY → MIDI mapping — H = middle C (C4)
   // Home row (A-') = E3–A4, top row = black keys
   const QWERTY_MAP: Record<string, number> = {
@@ -265,6 +378,7 @@ export default function App() {
   // Keyboard: QWERTY piano + Cmd+key shortcuts
   useEffect(() => {
     const handleDown = (e: KeyboardEvent) => {
+      if (splashVisibleRef.current) return;
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
 
       // Shift or Cmd/Ctrl + key = toolbar shortcuts
@@ -277,6 +391,7 @@ export default function App() {
             if (!next) clearLatch();
             return next;
           });
+          setNoteLockTooltip("");
         } else if (key === "s") {
           e.preventDefault();
           setSuggestMode((v) => !v);
@@ -311,6 +426,10 @@ export default function App() {
         e.preventDefault();
         qwertyHeldRef.current.add(key);
         handleNoteOn(midi);
+        if (latchMode && splashChoice === "keyboard" && !noteLockDisableShown.current) {
+          noteLockDisableShown.current = true;
+          setNoteLockTooltip("Disable Note Lock to play naturally");
+        }
       }
     };
 
@@ -335,12 +454,19 @@ export default function App() {
       window.removeEventListener("keydown", handleDown);
       window.removeEventListener("keyup", handleUp);
     };
-  }, [clearLatch, handleNoteOn, handleNoteOff, handleSustainOn, handleSustainOff, replayChord]);
+  }, [clearLatch, handleNoteOn, handleNoteOff, handleSustainOn, handleSustainOff, replayChord, latchMode, splashChoice]);
 
   useEffect(() => {
+    if (!midiRequested) return;
     initMIDI(
       {
-        noteOn: handleNoteOn,
+        noteOn: (note: number, velocity: number) => {
+          handleNoteOn(note, velocity);
+          if (latchMode && splashChoice === "keyboard" && !noteLockDisableShown.current) {
+            noteLockDisableShown.current = true;
+            setNoteLockTooltip("Disable Note Lock to play naturally");
+          }
+        },
         noteOff: handleNoteOff,
         allNotesOff: handleAllNotesOff,
         sustainOn: handleSustainOn,
@@ -359,7 +485,7 @@ export default function App() {
         }
       },
     );
-  }, [handleNoteOn, handleNoteOff, handleAllNotesOff, handleSustainOn, handleSustainOff]);
+  }, [midiRequested, handleNoteOn, handleNoteOff, handleAllNotesOff, handleSustainOn, handleSustainOff, latchMode, splashChoice]);
 
   // Mic toggle
   useEffect(() => {
@@ -367,13 +493,11 @@ export default function App() {
       startMic({
         onNotesChanged: (detected) => {
           const prev = micNotesRef.current;
-          // Notes that appeared
           for (const note of detected) {
-            if (!prev.has(note)) handleNoteOn(note, 80);
+            if (!prev.has(note)) handleNoteOn(note, 80, true);
           }
-          // Notes that disappeared
           for (const note of prev) {
-            if (!detected.has(note)) handleNoteOff(note);
+            if (!detected.has(note)) handleNoteOff(note, true);
           }
           micNotesRef.current = new Set(detected);
         },
@@ -381,14 +505,45 @@ export default function App() {
       });
     } else {
       stopMic();
-      // Release any mic-held notes
       for (const note of micNotesRef.current) {
-        handleNoteOff(note);
+        handleNoteOff(note, true);
       }
       micNotesRef.current.clear();
     }
     return () => { if (micEnabled) stopMic(); };
   }, [micEnabled, handleNoteOn, handleNoteOff]);
+
+  useEffect(() => {
+    if (cameraEnabled) {
+      startCamera({
+        onNoteOn: (note, velocity) => {
+          cameraNotesRef.current.add(note);
+          handleNoteOn(note, velocity);
+        },
+        onNoteOff: (note) => {
+          cameraNotesRef.current.delete(note);
+          handleNoteOff(note);
+        },
+        onStatusChange: setCameraStatus,
+        onVideoReady: setCameraVideo,
+        onLandmarks: setCameraLandmarks,
+      });
+    } else {
+      stopCamera();
+      for (const note of cameraNotesRef.current) {
+        handleNoteOff(note);
+      }
+      cameraNotesRef.current.clear();
+      setCameraVideo(null);
+      setCameraLandmarks(null);
+    }
+    return () => { if (cameraEnabled) stopCamera(); };
+  }, [cameraEnabled, handleNoteOn, handleNoteOff]);
+
+  useEffect(() => {
+    if (!cameraEnabled) return;
+    if (settingsOpen) pauseCamera(); else resumeCamera();
+  }, [cameraEnabled, settingsOpen]);
 
   const chord = detectChord(activeNotes, noteNames, activeKey);
   const sortedNotes = [...activeNotes].sort((a, b) => a - b);
@@ -400,7 +555,21 @@ export default function App() {
     : null;
 
   return (
-    <div className={`app ${darkMode ? "dark" : "light"}`}>
+    <div className={`app ${darkMode ? "dark" : "light"} ${cameraEnabled && cameraVideo ? "camera-active" : ""}`}>
+      {cameraEnabled && cameraVideo && (
+        <CameraOverlay video={cameraVideo} landmarks={cameraLandmarks} />
+      )}
+      <RotatePrompt />
+      {splashVisible && (
+        <SplashScreen
+          midiStatus={midiStatus}
+          isMobile={isMobile}
+          darkMode={darkMode}
+          onToggleDarkMode={triggerThemeToggle}
+          onSelect={handleSplashSelect}
+          className={splashFading ? "fade-out" : ""}
+        />
+      )}
       <div className="chrome-bar" ref={(el) => {
         if (el) document.documentElement.style.setProperty("--chrome-bar-height", el.offsetHeight + "px");
       }}>
@@ -411,19 +580,26 @@ export default function App() {
         <ChromeSelect
           className="chrome-hide-mobile"
           id="input-select"
-          value={micEnabled ? "mic" : "midi"}
-          onChange={(val) => setMicEnabled(val === "mic")}
+          value={cameraEnabled ? "camera" : micEnabled ? "mic" : "keyboard"}
+          onChange={(val) => {
+            setMicEnabled(val === "mic");
+            setCameraEnabled(val === "camera");
+            if (val === "keyboard") setMidiRequested(true);
+          }}
           statusDot={
-            micEnabled
-              ? (micStatus === "active" ? "connected" : micStatus === "requesting" ? "pending" : "denied")
-              : (midiStatus.state === "connected" && midiStatus.deviceCount > 0 ? "connected"
-                : midiStatus.state === "pending" ? "pending" : "denied")
+            cameraEnabled
+              ? (cameraStatus === "active" ? "connected" : cameraStatus === "requesting" || cameraStatus === "loading" ? "pending" : "denied")
+              : micEnabled
+                ? (micStatus === "active" ? "connected" : micStatus === "requesting" ? "pending" : "denied")
+                : (midiStatus.state === "connected" && midiStatus.deviceCount > 0 ? "connected"
+                  : midiStatus.state === "pending" ? "pending" : "denied")
           }
         >
-          <option value="midi">
+          <option value="keyboard">
             {midiStatus.state === "unsupported" ? "Keyboard" : "Midi"}
           </option>
           <option value="mic">Microphone</option>
+          <option value="camera">Camera</option>
         </ChromeSelect>
 
         <ChromeSelect
@@ -498,17 +674,44 @@ export default function App() {
           </optgroup>
         </ChromeSelect>
 
+        {scaleMode && activeKey && (
+          <div
+            className={`chrome-cell chrome-toggle chrome-hide-mobile ${scaleDemoPlaying ? "active" : ""}`}
+            onClick={() => scaleDemoPlaying ? stopScaleDemo() : startScaleDemo()}
+            title="Play scale demo"
+          >
+            {scaleDemoPlaying ? (
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                <rect x="1" y="1" width="4" height="10" />
+                <rect x="7" y="1" width="4" height="10" />
+              </svg>
+            ) : (
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                <polygon points="2,0 12,6 2,12" />
+              </svg>
+            )}
+          </div>
+        )}
+
         <div
+          ref={noteLockRef}
           className={`chrome-cell chrome-toggle ${latchMode ? "active" : ""}`}
           onClick={() => {
             setLatchMode((v) => {
               if (v) clearLatch();
               return !v;
             });
+            setNoteLockTooltip("");
           }}
-          title="Key Lock — notes stay held (⇧L)"
+          title="Note Lock — notes stay held (⇧L)"
         >
-          Key lock <HotkeyBadge label="Shift+L" active={latchMode} />
+          Note lock <HotkeyBadge label="Shift+L" active={latchMode} />
+          <Coachmark
+            text={noteLockTooltip}
+            visible={!!noteLockTooltip}
+            duration={6000}
+            onDismiss={() => setNoteLockTooltip("")}
+          />
         </div>
 
         {showHotkeys && (
@@ -539,19 +742,22 @@ export default function App() {
                       <span className="settings-mobile-label">
                         Input
                         <span className={`status-dot ${
-                          micEnabled
-                            ? (micStatus === "active" ? "connected" : micStatus === "requesting" ? "pending" : "denied")
-                            : (midiStatus.state === "connected" && midiStatus.deviceCount > 0 ? "connected"
-                              : midiStatus.state === "pending" ? "pending" : "denied")
+                          cameraEnabled
+                            ? (cameraStatus === "active" ? "connected" : cameraStatus === "requesting" || cameraStatus === "loading" ? "pending" : "denied")
+                            : micEnabled
+                              ? (micStatus === "active" ? "connected" : micStatus === "requesting" ? "pending" : "denied")
+                              : (midiStatus.state === "connected" && midiStatus.deviceCount > 0 ? "connected"
+                                : midiStatus.state === "pending" ? "pending" : "denied")
                         }`} />
                       </span>
                       <select
                         className="settings-mobile-select"
-                        value={micEnabled ? "mic" : "midi"}
-                        onChange={(e) => { setMicEnabled(e.target.value === "mic"); e.target.blur(); }}
+                        value={cameraEnabled ? "camera" : micEnabled ? "mic" : "keyboard"}
+                        onChange={(e) => { const v = e.target.value; setMicEnabled(v === "mic"); setCameraEnabled(v === "camera"); if (v === "keyboard") setMidiRequested(true); e.target.blur(); }}
                       >
-                        <option value="midi">Midi</option>
+                        <option value="keyboard">Midi</option>
                         <option value="mic">Microphone</option>
+                        <option value="camera">Camera</option>
                       </select>
                     </div>
                     <div className="settings-mobile-row">
@@ -635,7 +841,7 @@ export default function App() {
                   <button className="settings-item" onClick={() => setShowParticles((v) => !v)}>
                     Particles <span className={`settings-check ${showParticles ? "checked" : ""}`} />
                   </button>
-                  <button className="settings-item" onClick={() => setDarkMode((v) => { const next = !v; localStorage.setItem("darkMode", String(next)); return next; })}>
+                  <button className="settings-item" onClick={(e) => triggerThemeToggle(e)}>
                     Dark mode <span className={`settings-check ${darkMode ? "checked" : ""}`} />
                   </button>
                 </div>
@@ -719,7 +925,13 @@ export default function App() {
           noteNameLabels={showNoteNames ? noteNames : undefined}
           activeNoteNames={isMobile ? noteNames : undefined}
           scrollLocked={scrollLocked}
-          onNoteOn={(n) => handleNoteOn(n)}
+          onNoteOn={(n) => {
+            handleNoteOn(n);
+            if (!latchMode && splashChoice && splashChoice !== "keyboard" && !noteLockEnableShown.current) {
+              noteLockEnableShown.current = true;
+              setNoteLockTooltip("Enable Note Lock to keep notes held");
+            }
+          }}
           onNoteOff={handleNoteOff}
         />
       </div>
