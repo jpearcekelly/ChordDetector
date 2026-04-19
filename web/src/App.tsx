@@ -6,7 +6,7 @@ import { detectKey, noteNamesForKey, formatKey, allKeys, romanNumeral, scaleNote
 import * as audio from "./lib/audioEngine";
 import type { SoundType } from "./lib/audioEngine";
 import { startMic, stopMic, type MicStatus } from "./lib/micEngine";
-import { startCamera, stopCamera, pauseCamera, resumeCamera, type CameraStatus } from "./lib/cameraEngine";
+import { startCamera, stopCamera, pauseCamera, resumeCamera, type CameraStatus, KNOB_X, KNOB_Y, KNOB_ENGAGE_RADIUS } from "./lib/cameraEngine";
 import type { NormalizedLandmark } from "@mediapipe/tasks-vision";
 import CameraOverlay from "./components/CameraOverlay";
 import Ripples from "./components/Ripples";
@@ -74,6 +74,9 @@ export default function App() {
   const [cameraVideo, setCameraVideo] = useState<HTMLVideoElement | null>(null);
   const [cameraLandmarks, setCameraLandmarks] = useState<NormalizedLandmark[][] | null>(null);
   const cameraNotesRef = useRef<Set<number>>(new Set());
+  const [cameraHoveredNotes, setCameraHoveredNotes] = useState<Set<number>>(new Set());
+  const [knobAngle, setKnobAngle] = useState(1.0);
+  const [knobEngaged, setKnobEngaged] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [splashVisible, setSplashVisible] = useState(true);
   const [splashFading, setSplashFading] = useState(false);
@@ -527,6 +530,17 @@ export default function App() {
         onStatusChange: setCameraStatus,
         onVideoReady: setCameraVideo,
         onLandmarks: setCameraLandmarks,
+        onHoveredNotes: setCameraHoveredNotes,
+        onKnobRotation: (delta, engaged) => {
+          setKnobEngaged(engaged);
+          if (engaged && delta !== 0) {
+            setKnobAngle((prev) => {
+              const next = Math.max(0, Math.min(1, prev + delta * 0.15));
+              audio.setDjFilterCutoff(next);
+              return next;
+            });
+          }
+        },
       });
     } else {
       stopCamera();
@@ -557,7 +571,14 @@ export default function App() {
   return (
     <div className={`app ${darkMode ? "dark" : "light"} ${cameraEnabled && cameraVideo ? "camera-active" : ""}`}>
       {cameraEnabled && cameraVideo && (
-        <CameraOverlay video={cameraVideo} landmarks={cameraLandmarks} />
+        <CameraOverlay
+          landmarks={cameraLandmarks}
+          knobAngle={knobAngle}
+          knobEngaged={knobEngaged}
+          knobX={KNOB_X}
+          knobY={KNOB_Y}
+          knobRadius={KNOB_ENGAGE_RADIUS}
+        />
       )}
       <RotatePrompt />
       {splashVisible && (
@@ -919,6 +940,7 @@ export default function App() {
       <div className="keyboard-area">
         <Keyboard
           activeNotes={activeNotes}
+          hoveredNotes={cameraEnabled ? cameraHoveredNotes : undefined}
           suggestedPitchClasses={suggestMode ? chord.missingNotes : []}
           scalePitchClasses={scalePitchClasses}
           hotkeyLabels={showHotkeys ? MIDI_TO_KEY : undefined}

@@ -5,11 +5,12 @@ import type { PillVariant } from "./NotePill";
 
 interface KeyboardProps {
   activeNotes: Set<number>;
-  suggestedPitchClasses?: number[]; // pitch classes to highlight as ghost notes
-  scalePitchClasses?: number[]; // pitch classes in the active scale
-  hotkeyLabels?: Record<number, string>; // MIDI note → key label to show on keys
-  noteNameLabels?: string[]; // 12-element array of note names indexed by pitch class (all keys)
-  activeNoteNames?: string[]; // 12-element array — always shown on active keys regardless of noteNameLabels
+  hoveredNotes?: Set<number>;
+  suggestedPitchClasses?: number[];
+  scalePitchClasses?: number[];
+  hotkeyLabels?: Record<number, string>;
+  noteNameLabels?: string[];
+  activeNoteNames?: string[];
   scrollLocked?: boolean;
   onNoteOn?: (note: number) => void;
   onNoteOff?: (note: number) => void;
@@ -72,7 +73,7 @@ const TOUCH_MIN_KEY_WIDTH = 52;
 const C4_WHITE_IDX = MIDI_TO_WHITE_IDX.get(60) ?? 23;
 
 
-export default function Keyboard({ activeNotes, suggestedPitchClasses = [], scalePitchClasses = [], hotkeyLabels, noteNameLabels, activeNoteNames, scrollLocked = false, onNoteOn, onNoteOff }: KeyboardProps) {
+export default function Keyboard({ activeNotes, hoveredNotes, suggestedPitchClasses = [], scalePitchClasses = [], hotkeyLabels, noteNameLabels, activeNoteNames, scrollLocked = false, onNoteOn, onNoteOff }: KeyboardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const pressedRef = useRef<number | null>(null);
@@ -98,11 +99,9 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], scal
 
     const MIN_KEY_WIDTH = isTouchDevice ? TOUCH_MIN_KEY_WIDTH : 40;
     if (isTouchDevice) {
-      // Full 88 keys, scrollable
       visibleWhite = WHITE_KEYS;
       visibleBlack = BLACK_KEY_LIST;
     } else {
-      // Desktop: fixed 4 octaves, C2 (36) to C6 (84)
       visibleWhite = WHITE_KEYS.filter(m => m >= 36 && m <= 84);
       visibleBlack = BLACK_KEY_LIST.filter(bk => bk.midi >= 36 && bk.midi <= 84);
     }
@@ -162,7 +161,8 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], scal
     for (let i = 0; i < numWhite; i++) {
       const midi = visibleWhite[i];
       const isActive = activeNotes.has(midi);
-      const isSuggested = !isActive && suggestedSet.has(midi % 12);
+      const isHovered = !isActive && hoveredNotes?.has(midi);
+      const isSuggested = !isActive && !isHovered && suggestedSet.has(midi % 12);
       const isOutOfScale = scaleSet.size > 0 && !scaleSet.has(midi % 12);
       const x = i * wkw;
 
@@ -172,6 +172,8 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], scal
         ctx.fillStyle = hasScale
           ? (inScale ? "#22c55e" : "#ef4444")
           : "#eab308";
+      } else if (isHovered) {
+        ctx.fillStyle = "rgba(234, 179, 8, 0.3)";
       } else if (isSuggested) {
         ctx.fillStyle = "#faf5eb";
       } else if (isOutOfScale) {
@@ -251,7 +253,8 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], scal
       const localXPos = xPos - globalOffset;
 
       const isActive = activeNotes.has(midi);
-      const isSuggested = !isActive && suggestedSet.has(midi % 12);
+      const isHovered = !isActive && hoveredNotes?.has(midi);
+      const isSuggested = !isActive && !isHovered && suggestedSet.has(midi % 12);
       const isOutOfScale = scaleSet.size > 0 && !scaleSet.has(midi % 12);
       const x = localXPos * wkw - bkw / 2;
 
@@ -261,6 +264,9 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], scal
         ctx.fillStyle = hasScale
           ? (inScale ? "#22c55e" : "#ef4444")
           : "#eab308";
+        ctx.fillRect(x, 0, bkw, bkh);
+      } else if (isHovered) {
+        ctx.fillStyle = "rgba(234, 179, 8, 0.5)";
         ctx.fillRect(x, 0, bkw, bkh);
       } else if (isSuggested) {
         ctx.fillStyle = "#8a7a50";
@@ -317,7 +323,7 @@ export default function Keyboard({ activeNotes, suggestedPitchClasses = [], scal
 
     // Save for hit-testing
     visibleStateRef.current = { white: visibleWhite, black: visibleBlack };
-  }, [activeNotes, suggestedPitchClasses, scalePitchClasses, hotkeyLabels, noteNameLabels, activeNoteNames]);
+  }, [activeNotes, hoveredNotes, suggestedPitchClasses, scalePitchClasses, hotkeyLabels, noteNameLabels, activeNoteNames]);
 
   // Scroll to center on middle C (C4) on first render
   useEffect(() => {

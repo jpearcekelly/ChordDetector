@@ -13,6 +13,7 @@ let compressor: Tone.Compressor | null = null;
 let limiter: Tone.Limiter | null = null;
 let velocityGain: Tone.Gain | null = null;
 let brightnessFilter: Tone.Filter | null = null;
+let djFilter: Tone.Filter | null = null;
 let panner: Tone.Panner | null = null;
 let reverb: Tone.Reverb | null = null;
 let reverbGain: Tone.Gain | null = null;
@@ -76,6 +77,13 @@ function ensureEffectsChain() {
     Q: 0.5,
   });
 
+  djFilter = new Tone.Filter({
+    type: "lowpass",
+    frequency: 18000,
+    rolloff: -24,
+    Q: 2,
+  });
+
   velocityGain = new Tone.Gain(1);
   panner = new Tone.Panner(0);
 
@@ -103,7 +111,7 @@ function ensureEffectsChain() {
 // Connect a source into the shared chain
 function connectSource(source: Tone.ToneAudioNode) {
   ensureEffectsChain();
-  source.chain(velocityGain!, brightnessFilter!, panner!, compressor!);
+  source.chain(velocityGain!, brightnessFilter!, djFilter!, panner!, compressor!);
 }
 
 // ── Piano (Salamander sampler) ─────────────────────────
@@ -263,4 +271,20 @@ export function allNotesOff() {
   activeVelocities.clear();
   sampler?.releaseAll();
   synth?.releaseAll();
+}
+
+const DJ_FILTER_MIN = 200;
+const DJ_FILTER_MAX = 18000;
+
+export function setDjFilterCutoff(normalized: number) {
+  if (!djFilter) return;
+  const clamped = Math.max(0, Math.min(1, normalized));
+  const freq = DJ_FILTER_MIN * Math.pow(DJ_FILTER_MAX / DJ_FILTER_MIN, clamped);
+  djFilter.frequency.rampTo(freq, 0.05);
+}
+
+export function getDjFilterNormalized(): number {
+  if (!djFilter) return 1;
+  const freq = djFilter.frequency.value as number;
+  return Math.log(freq / DJ_FILTER_MIN) / Math.log(DJ_FILTER_MAX / DJ_FILTER_MIN);
 }

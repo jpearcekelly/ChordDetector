@@ -27,7 +27,8 @@ Deploy: `npx vercel --prod`
 ### Features
 - [x] Scale auto-demo — plays selected scale up and down 4 octaves, showcasing keyboard visuals
 - [x] Alternative sounds — sawtooth synth, Rhodes electric piano (sound selector)
-- [x] Camera input — webcam hand tracking with MediaPipe, finger extension detection, sustain-on-enter logic
+- [x] Camera input — webcam hand tracking with MediaPipe, curl-to-play triggering, hover highlights
+- [x] Camera DJ knob — virtual filter knob controlled by hand rotation, lowpass sweep
 
 ### Product / Growth
 - [ ] Custom domain + proper hosting

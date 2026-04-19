@@ -1101,13 +1101,19 @@ body {
   left: 0;
   width: 100vw;
   height: 100vh;
-  z-index: 0;
+  z-index: 200;
   pointer-events: none;
+}
+
+.app.camera-active .chrome-bar {
+  position: relative;
+  z-index: 100;
+  background: var(--bg);
 }
 
 .app.camera-active .chord-display {
   background: transparent;
-  z-index: 1;
+  z-index: 3;
 }
 
 .app.camera-active .chord-name {
@@ -1120,16 +1126,6 @@ body {
   opacity: 0.5;
 }
 
-.app.camera-active .chrome-bar {
-  position: relative;
-  z-index: 100;
-  background: var(--bg);
-}
-
-.app.camera-active .keyboard-scroll {
-  z-index: 1;
-}
-
-.app.camera-active .keyboard-canvas {
-  opacity: 0.75;
+.app.camera-active .keyboard-area {
+  z-index: 3;
 }
